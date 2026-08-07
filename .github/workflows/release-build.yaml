@@ -1,6 +1,7 @@
-# Build the universal vase.app on macOS and attach the zip to the draft release.
+# Build vase app and attach the artifacts to the draft release.
 # Dispatched by release.yaml (a GITHUB_TOKEN push can't trigger workflows, so the
-# push to the release branch won't start this on its own). Re-runnable by hand.
+# push to the release branch won't start this on its own).
+
 name: Release build
 run-name: "Release build (v${{ inputs.version }})"
 

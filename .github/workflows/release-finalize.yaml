@@ -1,5 +1,6 @@
-# Finalize a release when its release PR is merged: tag the merge commit, publish
-# the draft release, and delete the release branch.
+# Finalize a release when its release PR is merged:
+# tag the merge commit, publish the draft release, and delete the release branch.
+
 name: Release finalize
 
 on:

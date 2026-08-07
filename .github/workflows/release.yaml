@@ -1,6 +1,7 @@
 # Prepare a release: bump the version, generate the changelog, open a release PR,
-# and kick off the build. Merging the PR publishes the release (see
-# release-finalize.yaml). Run manually from the Actions tab.
+# and kick off the build. Merging the PR publishes the release (see release-finalize.yaml).
+# Run manually.
+
 name: Release
 run-name: "Release (${{ inputs.version }})"
 
