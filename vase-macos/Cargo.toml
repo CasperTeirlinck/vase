@@ -1,6 +1,6 @@
 [package]
 name = "vase-macos"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 # vase_test.rs is an included test module of the vase bin (via #[path]),
 # not its own binary — disable auto-discovery and declare the real bin.
