@@ -7,8 +7,6 @@ version := `cd vase-macos && cargo read-manifest | jq -r .version`
 default:
     @just --list
 
-# --- build & checks ---
-
 build:
     cargo build --release --bin vase
 
@@ -18,8 +16,6 @@ test:
 check:
     cargo clippy --workspace --all-targets -- -D warnings
     cargo fmt --check
-
-# --- app bundle ---
 
 # Assemble dist/vase.app around an already-built binary at `binpath`.
 _bundle binpath ver:
@@ -35,9 +31,6 @@ app ver=version: build
     @just _bundle {{ bin }} {{ ver }}
     @echo "built {{ app }} (v{{ ver }})"
 
-# Universal (arm64 + x86_64) bundle, zipped for a GitHub release. Needs both rust
-
-# targets (added here). This is what the release build runs.
 release ver=version:
     rustup target add aarch64-apple-darwin x86_64-apple-darwin
     cargo build --release --bin vase --target aarch64-apple-darwin
@@ -51,8 +44,7 @@ release ver=version:
     ditto -c -k --keepParent "{{ app }}" "dist/vase-v{{ ver }}-macos.zip"
     @echo "packaged dist/vase-v{{ ver }}-macos.zip"
 
-# --- versioning (needs cargo-edit: `cargo install cargo-edit`) ---
-
+# Version bumping (requires cargo-edit: `cargo install cargo-edit`)
 bump-version-patch:
     @cargo set-version --workspace --bump patch
 
@@ -62,12 +54,10 @@ bump-version-minor:
 bump-version-major:
     @cargo set-version --workspace --bump major
 
-# --- changelog (needs git-cliff) ---
-
 # Write the full CHANGELOG.md, treating HEAD as the given version.
 changelog ver=version:
     git-cliff --tag v{{ ver }} --tag-pattern 'v.*' --config cliff.toml --output CHANGELOG.md
 
-# Print just this version's notes (for the GitHub release body).
+# Print just this version's notes.
 changelog-latest ver=version:
     @git-cliff --unreleased --tag v{{ ver }} --tag-pattern 'v.*' --strip all --config cliff.toml -o - | tail -n +2
