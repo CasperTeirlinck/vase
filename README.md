@@ -56,6 +56,9 @@ Grant the binary (or the terminal you launch it from) **Accessibility** and
 ./target/release/vase
 ```
 
+Or build a double-clickable app bundle with [`just`](https://github.com/casey/just):
+`just app`, then move `dist/vase.app` to Applications and launch it.
+
 vase runs as a menu-bar accessory (no Dock icon). It adopts your open windows as
 tabs on start and **restores every window to its original frame on exit**. Quit
 with `⌥a q`, the menu-bar item, or the hard-release chord `Ctrl+Alt+Cmd+Esc`.
@@ -147,6 +150,21 @@ tabs restacks them above the rest rather than parking anything off-screen. They
 are placed through Accessibility and focused across displays with a read-only
 SkyLight call. The layout is written to disk and re-matched to live windows
 after a restart or a display change.
+
+## Development and releases
+
+Build steps live in the [`justfile`](justfile), and CI calls the same recipes so
+local and CI builds match:
+
+- `just build` / `just test` / `just check`
+- `just app` builds `dist/vase.app` for your machine
+- `just release` builds a universal (arm64 + x86_64) `vase.app` and zips it
+
+Releases are cut from the Actions tab. The **Release** workflow bumps the
+version, generates the changelog with [git-cliff](https://git-cliff.org)
+(config in [`cliff.toml`](cliff.toml)), opens a release PR, and builds the app
+into a draft GitHub release. Merging that PR tags the commit and publishes the
+release with the `vase.app` zip attached.
 
 ## Limitations
 

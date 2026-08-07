@@ -1,0 +1,37 @@
+# Build the universal vase.app on macOS and attach the zip to the draft release.
+# Dispatched by release.yaml (a GITHUB_TOKEN push can't trigger workflows, so the
+# push to the release branch won't start this on its own). Re-runnable by hand.
+name: Release build
+run-name: "Release build (v${{ inputs.version }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build (e.g. 1.2.3)
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: "release/v${{ inputs.version }}"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v3
+
+      - name: Build universal vase.app and zip it
+        run: just release "${{ inputs.version }}"
+
+      - name: Upload to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "v${{ inputs.version }}" \
+            "dist/vase-v${{ inputs.version }}-macos.zip" \
+            --clobber --repo "${{ github.repository }}"
