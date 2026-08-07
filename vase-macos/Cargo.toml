@@ -1,0 +1,25 @@
+[package]
+name = "vase-macos"
+version = "0.1.0"
+edition = "2021"
+# vase_test.rs is an included test module of the vase bin (via #[path]),
+# not its own binary — disable auto-discovery and declare the real bin.
+autobins = false
+
+[[bin]]
+name = "vase"
+path = "src/bin/vase.rs"
+
+[dependencies]
+accessibility-sys = "0.2.0"
+core-foundation = "0.10.1"
+core-graphics = "0.25.0"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSWindow", "NSPanel", "NSResponder", "NSView", "NSControl", "NSTextField", "NSColor", "NSScreen", "NSText", "NSGraphics", "NSRunningApplication", "NSFont", "NSFontDescriptor", "NSAttributedString", "NSStringDrawing", "NSWorkspace", "NSImage", "NSImageView", "NSTextAttachment", "NSBezierPath", "NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSMenu", "NSMenuItem", "NSButton", "NSEvent", "objc2-core-foundation", "objc2-core-graphics"] }
+# CAShapeLayer/CALayer render the rounded-powerline tab shapes.
+objc2-quartz-core = { version = "0.3.2", features = ["CALayer", "CAShapeLayer", "objc2-core-foundation", "objc2-core-graphics"] }
+objc2-foundation = { version = "0.3.2", features = ["NSDate", "NSRunLoop"] }
+vase-core = { path = "../vase-core" }
+serde_json = "1.0.151"
+serde = { version = "1.0.229", features = ["derive"] }
+# Added via `cargo add` in Step 5 so versions resolve to the installed latest.

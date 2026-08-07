@@ -1,0 +1,75 @@
+prefix = "cmd"            # signal-routing to this physical key is build-time
+
+# --- Tile focus: move between tiles in the layout (tmux prefix+arrow) ---------
+[bindings]
+up    = "focus up"
+down  = "focus down"
+left  = "focus left"
+right = "focus right"
+
+# --- Split a tile (tmux `\` / `-`) -------------------------------------------
+"\\" = "split -h"         # new tile to the right
+"-"  = "split -v"         # new tile below
+
+# --- Move/swap the focused window spatially (tmux prefix+C-arrow swap-pane) ---
+"ctrl-up"    = "move up"
+"ctrl-down"  = "move down"
+"ctrl-left"  = "move left"
+"ctrl-right" = "move right"
+
+# --- Resize the focused tile (tmux prefix+S-arrow) ---------------------------
+"shift-up"    = "resize up"
+"shift-down"  = "resize down"
+"shift-left"  = "resize left"
+"shift-right" = "resize right"
+
+# --- Zoom the focused tile (tmux prefix+m) -----------------------------------
+m = "zoom"
+
+# --- Stacks = nested tabs (tmux inner C-e layer, collapsed onto this prefix) --
+tab       = "stack next"   # cycle to next tab in the focused stack
+"shift-tab" = "stack prev"
+s         = "stack"        # group focused tile with its sibling into a stack
+"shift-s" = "unstack"      # break the stack back into a split
+
+# --- Workspace nav = your bottom-bar tmux windows (tmux `,` `.` `[` `]`) ------
+","  = "workspace prev"
+"."  = "workspace next"
+"["  = "workspace prev"    # alias, muscle memory
+"]"  = "workspace next"    # alias
+"<"  = "workspace move-left"   # reorder in the strip (tmux `<`)
+">"  = "workspace move-right"
+l    = "workspace last"    # last workspace (tmux C-a l)
+w    = "workspace overview" # switcher popup (tmux tree-mode `w`)
+"1"  = "workspace select 1"
+"2"  = "workspace select 2"
+"3"  = "workspace select 3"
+# … 4-9 likewise
+
+# --- Window / workspace lifecycle --------------------------------------------
+t   = "rename"             # rename the current workspace/tab (tmux `t`)
+x   = "close"              # close the focused window (tmux `x` kill-pane)
+f   = "float"              # toggle focused window floating vs tiled
+"/" = "move-to-workspace"  # prompt: send window to another workspace (tmux `/`)
+
+# --- Meta --------------------------------------------------------------------
+a         = "send-prefix"  # emit a literal Cmd-a (recovers Select All)
+"?"       = "help"         # cheatsheet popup (tmux prefix-?)
+r         = "reload-config"
+escape    = "cancel"       # leave prefix mode
+
+# --- Per-app rules -----------------------------------------------------------
+# Replace tmux's if-shell conditionals with declarative rules.
+[[rules]]
+app = "Slack"
+workspace = "comms"        # Slack windows land here regardless of focus
+
+[[rules]]
+app = "1Password"
+float = true               # never tile; overlaps freely
+
+[[rules]]
+# Windows that are dialogs / non-resizable float automatically; listed here
+# only when the heuristic needs an override.
+app = "System Settings"
+float = true
