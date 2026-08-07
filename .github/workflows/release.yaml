@@ -44,7 +44,7 @@ jobs:
       - name: Bump version
         run: |
           just bump-version-${{ inputs.version }}
-          echo "VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' vase-macos/Cargo.toml | head -1)" >> "$GITHUB_ENV"
+          echo "VERSION=$(cd vase-macos && cargo read-manifest | jq -r .version)" >> "$GITHUB_ENV"
 
       - name: Create release branch
         run: |

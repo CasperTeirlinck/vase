@@ -3,7 +3,7 @@ set shell := ["bash", "-uc"]
 bin := "target/release/vase"
 app := "dist/vase.app"
 # App version = the vase-macos crate version.
-version := `sed -n 's/^version = "\(.*\)"/\1/p' vase-macos/Cargo.toml | head -1`
+version := `cd vase-macos && cargo read-manifest | jq -r .version`
 
 default:
     @just --list
