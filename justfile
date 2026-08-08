@@ -25,6 +25,8 @@ _bundle binpath ver:
     chmod +x "{{ app }}/Contents/MacOS/vase"
     cp assets/vase.icns "{{ app }}/Contents/Resources/vase.icns"
     sed "s/__VERSION__/{{ ver }}/g" assets/Info.plist > "{{ app }}/Contents/Info.plist"
+    # Ad-hoc sign last (seals the bundle) so Accessibility/Input-Monitoring grants attach: TCC keys grants to a code signature.
+    codesign --force --deep --sign - "{{ app }}"
 
 # Build for the host arch and bundle it. Try it locally: `just app && open dist/vase.app`
 app ver=version: build
