@@ -1,0 +1,10 @@
+# vase config. On first run vase writes this to ~/Library/Application Support/vase/config.toml.
+
+# A global hotkey that toggles focus to an app: press the chord to bring it forward, press again to hide it.
+# Add one [[app_focus]] block per app.
+[[app_focus]]
+# modifiers (ctrl, cmd, alt, shift) joined with "+", then a key name
+# (a letter, a digit, or grave, space, escape, tab, ...)
+key = "ctrl+grave"
+# app name as shown in the menu bar / Cmd-Tab
+app = "Ghostty"

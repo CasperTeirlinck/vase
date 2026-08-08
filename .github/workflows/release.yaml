@@ -1,0 +1,129 @@
+# Prepare a release: bump the version, generate the changelog, open a release PR,
+# and kick off the build. Merging the PR publishes the release (see release-finalize.yaml).
+# Run manually.
+
+name: Release
+run-name: "Release (${{ inputs.version }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version bump
+        required: true
+        type: choice
+        options: [patch, minor, major]
+      prerelease:
+        description: Pre-release
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0 # full history for the changelog
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v3
+      - uses: taiki-e/install-action@git-cliff
+
+      - name: Install cargo-edit
+        run: |
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall cargo-edit --no-confirm
+
+      - name: Bump version
+        run: |
+          just bump-version-${{ inputs.version }}
+          echo "VERSION=$(cd vase-macos && cargo read-manifest | jq -r .version)" >> "$GITHUB_ENV"
+
+      - name: Create release branch
+        run: |
+          BRANCH="release/v${VERSION}"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Generate changelog
+        run: just changelog "${VERSION}"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): v${VERSION}"
+          git push origin "$BRANCH"
+
+      - name: Compare link
+        run: |
+          LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+          if [ -n "$LAST" ]; then
+            echo "DIFF=https://github.com/${{ github.repository }}/compare/${LAST}...${BRANCH}" >> "$GITHUB_ENV"
+          else
+            echo "DIFF=https://github.com/${{ github.repository }}/commits/${BRANCH}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Create draft release
+        id: rel
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const notes = execSync(`just changelog-latest ${process.env.VERSION}`, { encoding: 'utf8' });
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${process.env.VERSION}`,
+              name: `vase v${process.env.VERSION}`,
+              body: notes,
+              draft: true,
+              prerelease: ${{ inputs.prerelease }},
+              target_commitish: process.env.BRANCH,
+            });
+            core.setOutput('url', data.html_url);
+
+      - name: Open release PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const notes = execSync(`just changelog-latest ${process.env.VERSION}`, { encoding: 'utf8' });
+            await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `chore(release): v${process.env.VERSION}`,
+              head: process.env.BRANCH,
+              base: 'main',
+              body: [
+                `Prepares **vase v${process.env.VERSION}**.`,
+                ``,
+                `- [Changes](${process.env.DIFF})`,
+                `- [Draft release](${{ steps.rel.outputs.url }})`,
+                ``,
+                notes,
+                ``,
+                `Merge to tag the release and publish it.`,
+              ].join('\n'),
+            });
+
+      # A GITHUB_TOKEN push doesn't trigger workflows, so start the build ourselves.
+      - name: Trigger the release build
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-build.yaml',
+              ref: process.env.BRANCH,
+              inputs: { version: process.env.VERSION },
+            });

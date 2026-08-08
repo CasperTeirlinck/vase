@@ -1,0 +1,112 @@
+# Finalize a release when its release PR is merged:
+# tag the merge commit, publish the draft release, and delete the release branch.
+
+name: Release finalize
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  finalize:
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Version from branch name
+        run: echo "VERSION=${GITHUB_HEAD_REF#release/v}" >> "$GITHUB_ENV"
+
+      - name: Tag the merge commit and publish the draft release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = `v${process.env.VERSION}`;
+            const sha = context.payload.pull_request.merge_commit_sha;
+            await github.rest.git.createRef({
+              owner: context.repo.owner, repo: context.repo.repo,
+              ref: `refs/tags/${tag}`, sha,
+            });
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner, repo: context.repo.repo,
+            });
+            const draft = releases.find(r => r.tag_name === tag && r.draft);
+            if (!draft) { core.setFailed(`no draft release found for ${tag}`); return; }
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner, repo: context.repo.repo,
+              release_id: draft.id, draft: false, target_commitish: sha,
+            });
+
+      - name: Delete the release branch
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.git.deleteRef({
+              owner: context.repo.owner, repo: context.repo.repo,
+              ref: `heads/release/v${process.env.VERSION}`,
+            });
+
+  # Update the Homebrew tap (formula + cask) to the new version.
+  # Skipped unless a HOMEBREW_TAP_TOKEN secret (PAT with write access to the tap repo) is set.
+  homebrew:
+    needs: finalize
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on the tap token
+        id: gate
+        env:
+          TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "HOMEBREW_TAP_TOKEN not set; skipping tap update."
+          fi
+
+      - name: Version from branch name
+        if: steps.gate.outputs.ok == 'true'
+        run: echo "VERSION=${GITHUB_HEAD_REF#release/v}" >> "$GITHUB_ENV"
+
+      - name: Checkout vase (for the tap templates)
+        if: steps.gate.outputs.ok == 'true'
+        uses: actions/checkout@v6
+
+      - name: Compute checksums of the published assets
+        if: steps.gate.outputs.ok == 'true'
+        run: |
+          base="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+          curl -fsSL "$base/vase-v${VERSION}-macos.zip" -o app.zip
+          curl -fsSL "$base/vase-v${VERSION}-macos.tar.gz" -o bin.tar.gz
+          echo "ZIP_SHA=$(shasum -a 256 app.zip | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          echo "BIN_SHA=$(shasum -a 256 bin.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Checkout the tap
+        if: steps.gate.outputs.ok == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-vase
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Render formula and cask
+        if: steps.gate.outputs.ok == 'true'
+        run: |
+          mkdir -p tap/Formula tap/Casks
+          sed -e "s/VERSION_PLACEHOLDER/${VERSION}/g" -e "s/SHA256_PLACEHOLDER/${BIN_SHA}/g" \
+            packaging/homebrew/vase.rb > tap/Formula/vase.rb
+          sed -e "s/VERSION_PLACEHOLDER/${VERSION}/g" -e "s/SHA256_PLACEHOLDER/${ZIP_SHA}/g" \
+            packaging/homebrew/vase-cask.rb > tap/Casks/vase.rb
+
+      - name: Commit and push to the tap
+        if: steps.gate.outputs.ok == 'true'
+        working-directory: tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/vase.rb Casks/vase.rb
+          git commit -m "vase ${VERSION}" || { echo "nothing to update"; exit 0; }
+          git push origin HEAD
