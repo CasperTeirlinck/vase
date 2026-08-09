@@ -10,6 +10,9 @@ use super::{PendingLaunch, PickItem};
 use crate::daemon::Daemon;
 use crate::overlay::SwitchRow;
 
+/// Reconcile ticks a pending launch waits for its window before it's dropped.
+const LAUNCH_ADOPT_TICKS: u32 = 100; // ~10 s at the ~100 ms reconcile poll
+
 impl Daemon {
     /// Auto-open the picker over a focused empty pane, close it when the pane fills.
     pub(crate) fn refresh_pane_picker(&mut self) {
@@ -77,16 +80,25 @@ impl Daemon {
                 self.dispatch(Command::FillPane(id));
             }
             PickItem::Launch(i) => {
-                if let Err(e) = std::process::Command::new("open").arg("-na").arg(&self.apps[i]).spawn() {
-                    eprintln!("vase: failed to launch {}: {e}", self.apps[i]);
+                let app = self.apps[i].clone();
+                // `-n` opens a fresh instance so an already-running app still yields a new window for the pane. Singletons
+                // refuse `-n`, so fall back to plain activation. Finder won't open a window on activation, so point it at $HOME.
+                let cmd = if app == "Finder" {
+                    "open ~".to_string()
+                } else {
+                    let q = app.replace('\'', r"'\''");
+                    format!("open -na '{q}' || open -a '{q}'")
+                };
+
+                if let Err(e) = std::process::Command::new("sh").arg("-c").arg(&cmd).spawn() {
+                    eprintln!("failed to launch {app}: {e}");
                 }
-                // ~5 s at the 100 ms poll to adopt the launched window.
-                self.pending_launch = Some(PendingLaunch { app: self.apps[i].clone(), ticks: 50 });
+                self.pending_launch = Some(PendingLaunch { app, ticks: LAUNCH_ADOPT_TICKS });
                 // Clear the picker but keep focus on the empty pane; the "launching…" container renders there.
                 self.pane_picker = None;
                 self.refresh_pane_picker();
             }
-            PickItem::Header { .. } => {} // not selectable
+            PickItem::Header { .. } => {}
         }
     }
 
