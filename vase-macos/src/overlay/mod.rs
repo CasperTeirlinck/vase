@@ -9,6 +9,8 @@ mod tab_bar;
 pub(crate) mod text;
 mod theme;
 
+pub(crate) use theme::{by_name, parse_hex, set_mark, set_theme, Mark, Theme, ONE_DARK};
+
 pub use deck::{Chrome, Overlays};
 pub use panes::{FocusBorder, PaneOverlay};
 pub use screens::all_screens;

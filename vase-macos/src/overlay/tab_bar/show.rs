@@ -26,7 +26,9 @@ impl TabBar {
         let dot_d = 8.0;
         let dot_x = bar_rect.w - dot_d - 9.0;
         let content_w = if main { (dot_x - 9.0).max(0.0) } else { bar_rect.w };
-        let (container, content_view, shapes_layer, lead_w) = self.begin(bar_rect, content_w, main);
+        let (container, content_view, shapes_layer, lead_w, glyph_label) = self.begin(bar_rect, content_w, main);
+        // No leading pill (a stack bar, or the mark hidden) means the first tab caps like a stack bar's.
+        let capped_start = !main || matches!(mark(), Mark::Hidden);
         let scale = self.panel.scale();
         let font = NSFont::monospacedSystemFontOfSize_weight(FONT_SIZE, 0.0);
         // Full-height rounded ends: a full-semicircle notch/bulge.
@@ -34,9 +36,9 @@ impl TabBar {
         // Content starts just past the notch (`r` deep) plus a small gap.
         let left_pad = r + 5.0;
         let right_pad = 6.0;
-        let mut labels: Vec<Retained<NSTextField>> = Vec::new();
+        let mut labels: Vec<Retained<NSTextField>> = glyph_label.into_iter().collect();
         let mut ranges = Vec::new();
-        let mut hotkey_spans: Vec<(f64, f64)> = Vec::new();
+        let mut hotkey_spans: Vec<(f64, f64, bool)> = Vec::new();
 
         let mut cursor = lead_w;
         // Icons are separate NSImageViews, not label attachments: an attachment inside the label intermittently swallowed the text.
@@ -64,13 +66,13 @@ impl TabBar {
             // Grey position number in front of the icon (the `prefix-N` shortcut), with a leading Space marker
             let num_seg = NSMutableAttributedString::new();
             if *off_space {
-                num_seg.appendAttributedString(&segment(SPACE_MARK, &font, &clay(), None));
+                num_seg.appendAttributedString(&segment(SPACE_MARK, &font, &accent(), None));
                 num_seg.appendAttributedString(&segment(" ", &font, &dim_col(), None));
             }
             num_seg.appendAttributedString(&segment(&format!("{number} "), &font, &dim_col(), None));
             let num_w = num_seg.size().width;
-            // A stack bar's first tab has a rounded-left cap, not a notch, so its content clears the cap plus a small pad.
-            let cap_left = !main && i == 0;
+            // A capped-start first tab has a rounded-left cap, not a notch, so its content clears the cap plus a small pad.
+            let cap_left = capped_start && i == 0;
             let content_left = if cap_left { 8.0 } else { left_pad };
             let body_w = if tsize.width > 0.0 {
                 let iw = n * (TAB_ICON + TAB_ICON_GAP);
@@ -99,7 +101,7 @@ impl TabBar {
             shapes_layer.addSublayer(&shape);
             // Stroke hotkey outlines on top AFTER all tabs, so a neighbour's notch fill doesn't paint over the convex-right side.
             if *hotkey {
-                hotkey_spans.push((cursor, cursor + body_w));
+                hotkey_spans.push((cursor, cursor + body_w, cap_left));
             }
 
             let mut x = cursor + content_left;
@@ -156,10 +158,11 @@ impl TabBar {
             cursor += body_w;
         }
         // Hotkey outlines, stroked on top (fill-less) so no neighbour covers the convex-right side.
-        for (x0, x1) in hotkey_spans {
+        for (x0, x1, cap) in hotkey_spans {
             let outline = CAShapeLayer::new();
             outline.setContentsScale(scale);
-            outline.setPath(Some(&tab_path(x0, x1, r, BAR_HEIGHT).CGPath()));
+            let path = if cap { tab_path_cap_left(x0, x1, r, BAR_HEIGHT) } else { tab_path(x0, x1, r, BAR_HEIGHT) };
+            outline.setPath(Some(&path.CGPath()));
             outline.setFillColor(None);
             outline.setStrokeColor(Some(&hotkey_border().CGColor()));
             outline.setLineWidth(1.5);
@@ -171,7 +174,7 @@ impl TabBar {
             dot.setBoxType(NSBoxType::Custom);
             dot.setTitlePosition(NSTitlePosition::NoTitle);
             dot.setCornerRadius(dot_d / 2.0);
-            let dot_color = if armed { clay() } else { dim_col() };
+            let dot_color = if armed { accent() } else { dim_col() };
             dot.setFillColor(&dot_color);
             dot.setBorderWidth(0.0);
             container.addSubview(&dot);

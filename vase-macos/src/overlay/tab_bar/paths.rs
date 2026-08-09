@@ -4,17 +4,19 @@ use std::sync::LazyLock;
 
 use objc2::rc::Retained;
 use objc2::MainThreadOnly;
-use objc2_app_kit::{NSBezierPath, NSView};
-use objc2_foundation::{NSPoint, NSRect, NSSize};
+use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBezierPath, NSFont, NSTextField, NSView};
+use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_quartz_core::{CALayer, CAShapeLayer};
 use vase_core::geometry::Rect;
 
+use super::super::text::segment;
 use super::super::theme::*;
-use super::super::BAR_HEIGHT;
+use super::super::{BAR_HEIGHT, FONT_SIZE};
 use super::TabBar;
 
-/// `begin`'s handles: `(container, content_view, content_layer, lead_w)`.
-type BarParts = (Retained<NSView>, Retained<NSView>, Retained<CALayer>, f64);
+/// `begin`'s handles: `(container, content_view, content_layer, lead_w, glyph_label)`.
+/// `glyph_label` is a user-glyph mark the caller must retain; `None` for the logo, a hidden, or a stack bar.
+type BarParts = (Retained<NSView>, Retained<NSView>, Retained<CALayer>, f64, Option<Retained<NSTextField>>);
 
 /// The vase brand mark parsed from docs/branding/vase-mark.svg: silhouette polygon normalized to a 0..1 box (`y` top→bottom), plus its aspect (width / height).
 struct VaseMark {
@@ -76,8 +78,9 @@ impl TabBar {
         bg_layer.addSublayer(&strip);
 
         let r = BAR_HEIGHT / 2.0;
-        // Stack bars carry no leading pill; their tabs begin at the strip's rounded-left corner (first notch centered at x=r).
-        if !main {
+        let mark = mark();
+        // No leading pill for a stack bar, or when the mark is hidden: tabs begin at the strip's rounded-left corner (first notch centered at x=r).
+        if !main || matches!(mark, Mark::Hidden) {
             let content_rect = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(content_w, BAR_HEIGHT));
             let content_view = NSView::initWithFrame(NSView::alloc(self.mtm), content_rect);
             content_view.setWantsLayer(true);
@@ -85,12 +88,17 @@ impl TabBar {
             let content_layer = content_view.layer().unwrap();
             content_layer.setContentsScale(scale);
             container.addSubview(&content_view);
-            return (container, content_view, content_layer, r);
+            return (container, content_view, content_layer, r, None);
         }
 
-        // Leading powerline block carrying the vase brand mark, shared by the tab view and the command line.
+        // Leading powerline block carrying the mark, shared by the tab view and the command line.
         let cap = BAR_HEIGHT / 2.0;
-        let glyph_w = 18.0;
+        // A user glyph sizes the slot to its own width; the logo uses a fixed slot.
+        let glyph = match &mark {
+            Mark::Glyph(g) => Some(segment(g, &NSFont::monospacedSystemFontOfSize_weight(FONT_SIZE + 1.0, 0.0), &accent(), None)),
+            _ => None,
+        };
+        let glyph_w = glyph.as_ref().map_or(18.0, |s| s.size().width.max(14.0));
         let lead_w = cap + 3.0 + glyph_w + 4.0;
         let lead = CAShapeLayer::new();
         lead.setContentsScale(scale);
@@ -98,16 +106,33 @@ impl TabBar {
         lead.setStrokeColor(Some(&tab_border().CGColor()));
         lead.setLineWidth(1.0);
         bg_layer.addSublayer(&lead);
-        // The vase silhouette, terracotta, centered in the pill's glyph slot.
-        let mark_h = BAR_HEIGHT - 8.0;
-        let mark_w = mark_h * VASE_MARK.aspect;
-        let mark_x = cap + 3.0 + (glyph_w - mark_w) / 2.0;
-        let mark_y = (BAR_HEIGHT - mark_h) / 2.0;
-        let vase = CAShapeLayer::new();
-        vase.setContentsScale(scale);
-        vase.setPath(Some(&vase_mark_bezier(mark_x, mark_y, mark_w, mark_h).CGPath()));
-        vase.setFillColor(Some(&clay().CGColor()));
-        bg_layer.addSublayer(&vase);
+        let glyph_label = match glyph {
+            // The vase silhouette in the accent color, centered in the pill's glyph slot.
+            None => {
+                let mark_h = BAR_HEIGHT - 8.0;
+                let mark_w = mark_h * VASE_MARK.aspect;
+                let mark_x = cap + 3.0 + (glyph_w - mark_w) / 2.0;
+                let mark_y = (BAR_HEIGHT - mark_h) / 2.0;
+                let vase = CAShapeLayer::new();
+                vase.setContentsScale(scale);
+                vase.setPath(Some(&vase_mark_bezier(mark_x, mark_y, mark_w, mark_h).CGPath()));
+                vase.setFillColor(Some(&accent().CGColor()));
+                bg_layer.addSublayer(&vase);
+                None
+            }
+            // The user glyph as a text label, centered in the slot.
+            Some(seg) => {
+                let tsize = seg.size();
+                let label = NSTextField::labelWithString(&NSString::from_str(""), self.mtm);
+                label.setUsesSingleLineMode(true);
+                let gx = cap + 3.0 + (glyph_w - tsize.width) / 2.0;
+                label.setFrame(NSRect::new(NSPoint::new(gx.round(), ((BAR_HEIGHT - tsize.height) / 2.0 + 1.0).round()), NSSize::new(tsize.width + 4.0, tsize.height)));
+                label.setAttributedStringValue(&seg);
+                label.setDrawsBackground(false);
+                container.addSubview(&label);
+                Some(label)
+            }
+        };
 
         // Clipped content view so long content stops before the prefix dot.
         let content_rect = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(content_w, BAR_HEIGHT));
@@ -118,7 +143,7 @@ impl TabBar {
         content_layer.setContentsScale(scale);
         container.addSubview(&content_view);
 
-        (container, content_view, content_layer, lead_w)
+        (container, content_view, content_layer, lead_w, glyph_label)
     }
 }
 

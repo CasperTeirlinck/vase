@@ -15,7 +15,10 @@ impl Daemon {
     /// Re-read config.toml and apply it (the menu-bar "Reload config" action).
     pub fn reload_config(&mut self) {
         self.app_hotkeys = crate::config::load();
-        self.refresh(); // hotkey-app tab markers may have changed
+        self.favorites = crate::config::favorites();
+        crate::overlay::set_theme(crate::config::load_theme());
+        crate::overlay::set_mark(crate::config::load_mark());
+        self.refresh(); // palette, mark, and hotkey/favorite markers may have changed
     }
 
     /// Toggle focus to `app`: if already on it, jump back to the previous window, else focus its first.

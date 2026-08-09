@@ -16,12 +16,42 @@ struct RawConfig {
     app_focus: Vec<RawAppFocus>,
     #[serde(default)]
     favorites: Vec<String>,
+    #[serde(default)]
+    theme: RawTheme,
+    #[serde(default)]
+    tabbar: RawTabbar,
 }
 
 #[derive(Deserialize)]
 struct RawAppFocus {
     key: String,
     app: String,
+}
+
+/// A named preset plus optional per-color hex overrides.
+#[derive(Deserialize, Default)]
+struct RawTheme {
+    name: Option<String>,
+    bg: Option<String>,
+    active: Option<String>,
+    dim_bg: Option<String>,
+    text: Option<String>,
+    dim: Option<String>,
+    accent: Option<String>,
+    badge: Option<String>,
+    border: Option<String>,
+    hotkey: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct RawTabbar {
+    mark: Option<String>,
+}
+
+fn read_raw() -> Option<RawConfig> {
+    let path = config_path()?;
+    let data = std::fs::read_to_string(&path).ok()?;
+    toml::from_str::<RawConfig>(&data).ok()
 }
 
 const DEFAULT: &str = include_str!("../../docs/vase.example.toml");
@@ -77,13 +107,40 @@ pub fn load() -> Vec<AppFocus> {
 
 /// Favorite app names, shown first in the app picker.
 pub fn favorites() -> Vec<String> {
-    let Some(path) = config_path() else {
-        return Vec::new();
+    read_raw().map(|c| c.favorites).unwrap_or_default()
+}
+
+/// The configured palette: a named preset (or the default) with any per-color hex overrides applied.
+pub(crate) fn load_theme() -> crate::overlay::Theme {
+    let raw = read_raw().map(|c| c.theme).unwrap_or_default();
+    let mut theme = raw.name.as_deref().and_then(crate::overlay::by_name).unwrap_or(crate::overlay::ONE_DARK);
+    let apply = |slot: &mut [f64; 4], hex: &Option<String>| {
+        if let Some(h) = hex {
+            match crate::overlay::parse_hex(h) {
+                Some(c) => *slot = c,
+                None => eprintln!("vase: config: invalid color {h:?}; ignoring"),
+            }
+        }
     };
-    let Ok(data) = std::fs::read_to_string(&path) else {
-        return Vec::new();
-    };
-    toml::from_str::<RawConfig>(&data).map(|c| c.favorites).unwrap_or_default()
+    apply(&mut theme.bg, &raw.bg);
+    apply(&mut theme.active, &raw.active);
+    apply(&mut theme.dim_bg, &raw.dim_bg);
+    apply(&mut theme.text, &raw.text);
+    apply(&mut theme.dim, &raw.dim);
+    apply(&mut theme.accent, &raw.accent);
+    apply(&mut theme.badge, &raw.badge);
+    apply(&mut theme.border, &raw.border);
+    apply(&mut theme.hotkey, &raw.hotkey);
+    theme
+}
+
+/// The configured tab-bar mark: the vase logo by default, a user glyph, or hidden (empty string).
+pub(crate) fn load_mark() -> crate::overlay::Mark {
+    match read_raw().and_then(|c| c.tabbar.mark).as_deref() {
+        None | Some("vase") => crate::overlay::Mark::Logo,
+        Some("") => crate::overlay::Mark::Hidden,
+        Some(glyph) => crate::overlay::Mark::Glyph(glyph.to_string()),
+    }
 }
 
 /// Persist the favorite app list into config.toml.

@@ -39,12 +39,12 @@ impl TabBar {
         TabBar { panel: Panel::new(mtm), labels: Vec::new(), mtm }
     }
 
-    /// Turn the bar into a command line: the leading vase mark stays (drawn by `begin`), and `prompt` fills the rest as a single-line text input.
+    /// Turn the bar into a command line: the leading mark stays (drawn by `begin`), and `prompt` fills the rest as a single-line text input.
     pub fn show_prompt(&mut self, content_rect: Rect, prompt: &str) {
         // The bar's own CG rect is the strip just below the content rect.
         let bar_rect = Rect::new(content_rect.x, content_rect.y + content_rect.h, content_rect.w, BAR_HEIGHT);
         // Full width: the command line has no prefix dot to avoid.
-        let (container, content_view, _shapes, lead_w) = self.begin(bar_rect, bar_rect.w, true);
+        let (container, content_view, _shapes, lead_w, glyph_label) = self.begin(bar_rect, bar_rect.w, true);
         let font = NSFont::monospacedSystemFontOfSize_weight(FONT_SIZE, 0.0);
         let text = segment(prompt, &font, &text_col(), None);
         let tsize = text.size();
@@ -57,7 +57,9 @@ impl TabBar {
         label.setAttributedStringValue(&text);
         label.setDrawsBackground(false);
         content_view.addSubview(&label);
-        self.labels = vec![label];
+        let mut labels: Vec<_> = glyph_label.into_iter().collect();
+        labels.push(label);
+        self.labels = labels;
         self.panel.show(&container);
     }
 

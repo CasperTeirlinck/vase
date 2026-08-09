@@ -96,6 +96,8 @@ impl Daemon {
     /// Construct the daemon from the startup-computed window/display state.
     #[allow(clippy::too_many_arguments)]
     pub fn new(mtm: MainThreadMarker, model: Model, backend: MacBackend, windows: Registry, main_screen: usize, screens_cg: Vec<Rect>, display_ids: Vec<u32>) -> Self {
+        crate::overlay::set_theme(crate::config::load_theme());
+        crate::overlay::set_mark(crate::config::load_mark());
         Daemon {
             model: Some(model),
             backend,

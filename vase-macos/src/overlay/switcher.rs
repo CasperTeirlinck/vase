@@ -135,9 +135,9 @@ impl SwitcherView {
                 let (hx, hw) = frame.highlight;
                 container.addSubview(&self.bar(hx, ry, hw, &active_bg()));
             }
-            // Clay left accent marks the focused window, so it stays marked as the selection moves away.
+            // The left accent marks the focused window, so it stays marked as the selection moves away.
             if frame.accent && row.current {
-                container.addSubview(&self.bar(1.0, ry, 3.0, &clay()));
+                container.addSubview(&self.bar(1.0, ry, 3.0, &accent()));
             }
             let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, row.dim, row.off_space, row.favorite, reserve, PANE_PAD, ry, inner_w);
             container.addSubview(&label);
@@ -164,7 +164,7 @@ impl SwitcherView {
         y: f64,
         width: f64,
     ) -> Retained<NSTextField> {
-        // Content order: clay marker gutter, grey index number, tree glyph, app icons, then text.
+        // Content order: accent marker gutter, grey index number, tree glyph, app icons, then text.
         let font = NSFont::monospacedSystemFontOfSize_weight(FONT_SIZE, 0.0);
         let text_color = if is_query { dim_col() } else { text_col() };
         let combined = NSMutableAttributedString::new();
@@ -177,7 +177,7 @@ impl SwitcherView {
             } else {
                 " "
             };
-            combined.appendAttributedString(&segment(glyph, &font, &clay(), None));
+            combined.appendAttributedString(&segment(glyph, &font, &accent(), None));
             combined.appendAttributedString(&segment(" ", &font, &text_color, None));
         }
         if number > 0 {
