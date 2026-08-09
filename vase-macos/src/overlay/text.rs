@@ -16,9 +16,7 @@ thread_local! {
         RefCell::new(HashMap::new());
 }
 
-/// Resolve `name`'s icon via NSWorkspace and cache it (incl. misses). Blocking, so call off the hot path to pre-warm.
-/// fullPathForApplication is deprecated for the bundle-id/URL APIs but is the only one mapping a plain app name
-/// to a path, which is all we have here.
+/// Resolve and cache `name`'s app icon (misses too). Blocking; pre-warm off the render hot path.
 #[allow(deprecated)]
 pub fn prewarm_icon(name: &str) {
     ICON_CACHE.with(|c| {
@@ -26,7 +24,15 @@ pub fn prewarm_icon(name: &str) {
             return;
         }
         let ws = NSWorkspace::sharedWorkspace();
-        let icon = ws.fullPathForApplication(&NSString::from_str(name)).map(|path| ws.iconForFile(&path));
+        // A window's owner name is the process name, which can differ from the `.app` file name (e.g. "Code" vs
+        // "Visual Studio Code.app"), so match a running app by localized name first; fall back to a name->path
+        // lookup for apps that aren't running (the launcher list, whose names are `.app` file stems).
+        let icon = ws
+            .runningApplications()
+            .iter()
+            .find(|a| a.localizedName().is_some_and(|n| n.to_string() == name))
+            .and_then(|a| a.icon())
+            .or_else(|| ws.fullPathForApplication(&NSString::from_str(name)).map(|path| ws.iconForFile(&path)));
         c.borrow_mut().insert(name.to_string(), icon);
     });
 }
