@@ -64,6 +64,8 @@ pub struct Daemon {
     pub pane_picker: Option<Switcher<PickItem>>,
     /// Launchable app names (file stems), discovered once at startup.
     apps: Vec<String>,
+    /// Favorite app names, shown first in the app picker.
+    favorites: Vec<String>,
     /// Cursor into `apps` for background icon pre-warming, spread over polls.
     icon_warm: usize,
     /// A launch spawned into the focused empty pane, awaiting its window.
@@ -113,6 +115,7 @@ impl Daemon {
             switcher: None,
             pane_picker: None,
             apps: discover_apps(),
+            favorites: crate::config::favorites(),
             icon_warm: 0,
             pending_launch: None,
             prompt: None,

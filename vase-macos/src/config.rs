@@ -14,6 +14,8 @@ pub struct AppFocus {
 struct RawConfig {
     #[serde(default)]
     app_focus: Vec<RawAppFocus>,
+    #[serde(default)]
+    favorites: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +75,33 @@ pub fn load() -> Vec<AppFocus> {
         .collect()
 }
 
+/// Favorite app names, shown first in the app picker.
+pub fn favorites() -> Vec<String> {
+    let Some(path) = config_path() else {
+        return Vec::new();
+    };
+    let Ok(data) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    toml::from_str::<RawConfig>(&data).map(|c| c.favorites).unwrap_or_default()
+}
+
+/// Persist the favorite app list into config.toml.
+pub fn save_favorites(favorites: &[String]) {
+    let Some(path) = config_path() else { return };
+    let text = std::fs::read_to_string(&path).unwrap_or_default();
+    let Ok(mut doc) = text.parse::<toml_edit::DocumentMut>() else {
+        eprintln!("config.toml is invalid TOML; not saving favorites");
+        return;
+    };
+    let mut arr = toml_edit::Array::new();
+    for f in favorites {
+        arr.push(f.as_str());
+    }
+    doc["favorites"] = toml_edit::value(arr);
+    let _ = std::fs::write(&path, doc.to_string());
+}
+
 /// Parse a chord like `ctrl+grave` or `cmd+shift+k` into a `Key`.
 fn parse_chord(s: &str) -> Option<Key> {
     let parts: Vec<&str> = s.split('+').map(str::trim).collect();
@@ -100,6 +129,21 @@ mod tests {
         assert_eq!(raw.app_focus.len(), 1);
         assert_eq!(raw.app_focus[0].app, "Ghostty");
         assert!(parse_chord(&raw.app_focus[0].key).is_some());
+    }
+
+    #[test]
+    fn save_favorites_upserts_a_readable_key_next_to_existing_tables() {
+        let src = "# a comment\n[[app_focus]]\nkey = \"ctrl+grave\"\napp = \"Ghostty\"\n";
+        let mut doc = src.parse::<toml_edit::DocumentMut>().unwrap();
+        let mut arr = toml_edit::Array::new();
+        arr.push("Brave Browser");
+        doc["favorites"] = toml_edit::value(arr);
+        let out = doc.to_string();
+        // The rewritten file must stay valid TOML, keep the hotkey, and read the favorite back.
+        let raw: RawConfig = toml::from_str(&out).unwrap();
+        assert_eq!(raw.favorites, vec!["Brave Browser".to_string()]);
+        assert_eq!(raw.app_focus.len(), 1);
+        assert!(out.contains("# a comment"));
     }
 
     #[test]

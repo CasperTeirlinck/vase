@@ -28,6 +28,9 @@ pub(crate) const FONT_SIZE: f64 = 12.0;
 /// Leading marker on a tab or row whose window is on another (non-current) macOS Space.
 pub(crate) const SPACE_MARK: &str = "◇";
 
+/// Leading marker on a favorite app row in the picker.
+pub(crate) const FAVORITE_MARK: &str = "★";
+
 /// Initialize NSApp as an accessory (no Dock icon) so AppKit windows render.
 pub fn nsapp_init(mtm: MainThreadMarker) {
     let app = NSApplication::sharedApplication(mtm);

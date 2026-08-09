@@ -3,7 +3,8 @@
 use std::time::Instant;
 
 use vase_core::backend::WindowInfo;
-use vase_core::input::{Key, Pick, Switcher};
+use vase_core::input::keys::char_for_keycode;
+use vase_core::input::{Key, Mods, Pick, Switcher};
 use vase_core::model::Command;
 
 use super::{PendingLaunch, PickItem};
@@ -53,15 +54,22 @@ impl Daemon {
             .map(|(item, _)| match item {
                 PickItem::Window { icons, display, prefix, dim, off_space, .. } => {
                     n += 1;
-                    SwitchRow { number: n, prefix, icons, label: display, dim, off_space, current: false }
+                    SwitchRow { number: n, prefix, icons, label: display, dim, off_space, favorite: false, current: false }
                 }
-                PickItem::Header { icons, display, prefix, dim, off_space } => SwitchRow { number: 0, prefix, icons, label: display, dim, off_space, current: false },
-                PickItem::Launch(i) => {
-                    SwitchRow { number: 0, prefix: String::new(), icons: vec![self.apps[i].clone()], label: format!("⧉  {}", self.apps[i]), dim: false, off_space: false, current: false }
-                }
+                PickItem::Header { icons, display, prefix, dim, off_space } => SwitchRow { number: 0, prefix, icons, label: display, dim, off_space, favorite: false, current: false },
+                PickItem::Launch(i) => SwitchRow {
+                    number: 0,
+                    prefix: String::new(),
+                    icons: vec![self.apps[i].clone()],
+                    label: format!("⧉  {}", self.apps[i]),
+                    dim: false,
+                    off_space: false,
+                    favorite: self.is_favorite(&self.apps[i]),
+                    current: false,
+                },
             })
             .collect();
-        let header = if s.is_searching() { format!("/ {}", s.query()) } else { "move here - 1-9 pick · j/k · / search · ⏎ move · esc cancel".to_string() };
+        let header = if s.is_searching() { format!("/ {}", s.query()) } else { "move here - 1-9 pick · j/k · / search · f ★ · ⏎ move · esc cancel".to_string() };
         let selected = s.selected();
         let area = self.model.as_ref().unwrap().empty_panes().into_iter().find(|(_, focused)| *focused).map(|(rect, _)| rect);
         if let Some(area) = area {
@@ -114,7 +122,24 @@ impl Daemon {
 
     /// Handle a key while the pane picker is open; consumes while open.
     pub fn pane_picker_key(&mut self, key: Key) -> bool {
-        let Some(s) = &mut self.pane_picker else { return false };
+        if self.pane_picker.is_none() {
+            return false;
+        }
+        // "f" in navigate mode toggles the selected app's favorite.
+        if key.mods == Mods::default() && char_for_keycode(key.code) == Some('f') {
+            let app = {
+                let s = self.pane_picker.as_ref().unwrap();
+                match s.visible().into_iter().nth(s.selected()) {
+                    Some((PickItem::Launch(i), _)) if !s.is_searching() => Some(self.apps[i].clone()),
+                    _ => None,
+                }
+            };
+            if let Some(app) = app {
+                self.toggle_favorite(app);
+                return true;
+            }
+        }
+        let s = self.pane_picker.as_mut().unwrap();
         match s.key(key, Instant::now()) {
             Pick::Ignored => {}
             Pick::Redraw => self.render_pane_picker(),

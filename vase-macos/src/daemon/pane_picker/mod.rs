@@ -4,7 +4,7 @@ mod keys;
 
 use std::collections::HashSet;
 
-use vase_core::input::Item;
+use vase_core::input::{Item, Switcher};
 use vase_core::tree::{find_window, windows, Node, WindowId};
 
 use super::switcher::{collect_children, Child};
@@ -71,10 +71,33 @@ impl Daemon {
                 }
             }
         }
-        for (i, app) in self.apps.iter().enumerate() {
-            out.push((PickItem::Launch(i), format!("⧉  {app}")));
+        // Favorites first, then the rest, each in discovery order.
+        let (fav, rest): (Vec<usize>, Vec<usize>) = (0..self.apps.len()).partition(|&i| self.is_favorite(&self.apps[i]));
+        for i in fav.into_iter().chain(rest) {
+            out.push((PickItem::Launch(i), format!("⧉  {}", self.apps[i])));
         }
         out
+    }
+
+    pub(crate) fn is_favorite(&self, app: &str) -> bool {
+        self.favorites.iter().any(|a| a == app)
+    }
+
+    /// Toggle an app's favorite state, persist it, and rebuild the picker keeping the cursor on that app.
+    pub(crate) fn toggle_favorite(&mut self, app: String) {
+        if let Some(pos) = self.favorites.iter().position(|a| *a == app) {
+            self.favorites.remove(pos);
+        } else {
+            self.favorites.push(app.clone());
+        }
+        crate::config::save_favorites(&self.favorites);
+        let items = self.build_pane_items();
+        let mut s = Switcher::new(items);
+        if let Some(idx) = s.visible().iter().position(|(it, _)| matches!(it, PickItem::Launch(i) if self.apps[*i] == app)) {
+            s.select(idx);
+        }
+        self.pane_picker = Some(s);
+        self.render_pane_picker();
     }
 
     /// Window rows beneath a multi-window tab's header, skipping windows in `exclude`.

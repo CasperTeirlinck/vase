@@ -70,7 +70,7 @@ impl Daemon {
                 .visible()
                 .into_iter()
                 .enumerate()
-                .map(|(i, (it, _))| SwitchRow { number: i + 1, prefix: it.prefix, icons: it.icons, label: it.display, dim: it.dim, off_space: it.off_space, current: it.current })
+                .map(|(i, (it, _))| SwitchRow { number: i + 1, prefix: it.prefix, icons: it.icons, label: it.display, dim: it.dim, off_space: it.off_space, favorite: false, current: it.current })
                 .collect();
             (rows, s.is_searching(), s.query().to_string(), s.selected())
         }) else {
