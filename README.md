@@ -4,6 +4,15 @@
 
 <p align="center">A cross-platform manual tiling window manager.</p>
 
+<p align="center">
+  <a href="https://github.com/CasperTeirlinck/vase/releases/latest"><img src="https://img.shields.io/github/v/release/CasperTeirlinck/vase?style=flat-square&color=blue" alt="Latest release"></a>
+  <a href="https://github.com/CasperTeirlinck/vase/releases"><img src="https://img.shields.io/github/downloads/CasperTeirlinck/vase/total?style=flat-square&color=blue" alt="Downloads"></a>
+  <a href="https://github.com/CasperTeirlinck/homebrew-vase"><img src="https://img.shields.io/badge/homebrew-tap-fbb040?style=flat-square&logo=homebrew&logoColor=white" alt="Homebrew tap"></a>
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square&logo=apple&logoColor=white" alt="Platform: macOS">
+  <img src="https://img.shields.io/badge/rust-2021-b7410e?style=flat-square&logo=rust&logoColor=white" alt="Rust 2021 edition">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/CasperTeirlinck/vase?style=flat-square&color=blue" alt="License: GPL-3.0"></a>
+</p>
+
 ---
 
 **vase** is a cross-platform\* keyboard-driven manual tiling window manager inspired by tmux.
