@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 (2026-08-09)
+
+### 🚀 Features
+
+- Spaces support
+
+### 🐛 Bug Fixes
+
+- Behave correctly when a window goes fullscreen
 ## 0.1.3 (2026-08-09)
 
 ### 🐛 Bug Fixes
