@@ -64,7 +64,8 @@ impl Overlays {
                 };
                 // Dim tabs not on the focused monitor; the number is the tab's `prefix-N` shortcut.
                 let dim = flat_tab(model, i).is_some_and(|(si, _)| si != model.focused_screen);
-                BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, hotkey }
+                let off_space = windows.iter().any(|id| chrome.off_space.contains(id));
+                BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, off_space, hotkey }
             })
             .collect();
         let ranges = self.bar.show(bar_rect, &bar_tabs, selected, chrome.prefix_armed, true);
@@ -97,7 +98,8 @@ impl Overlays {
                         }
                     };
                     let badged = chrome.badges.contains(&app);
-                    BarTab { icons: vec![app], badges: vec![badged], label, zoomed: false, number: i + 1, dim: false, hotkey: false }
+                    let off_space = chrome.off_space.contains(id);
+                    BarTab { icons: vec![app], badges: vec![badged], label, zoomed: false, number: i + 1, dim: false, off_space, hotkey: false }
                 })
                 .collect();
             let bar_rect = Rect::new(stack.rect.x, stack.rect.y, stack.rect.w, BAR_HEIGHT);

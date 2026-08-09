@@ -66,8 +66,12 @@ impl Daemon {
     pub(super) fn render_switcher(&mut self) {
         // Snapshot the visible rows so the switcher borrow ends before touching the overlays.
         let Some((rows, is_searching, query, selected)) = self.switcher.as_ref().map(|s| {
-            let rows: Vec<SwitchRow> =
-                s.visible().into_iter().enumerate().map(|(i, (it, _))| SwitchRow { number: i + 1, prefix: it.prefix, icons: it.icons, label: it.display, dim: it.dim, current: it.current }).collect();
+            let rows: Vec<SwitchRow> = s
+                .visible()
+                .into_iter()
+                .enumerate()
+                .map(|(i, (it, _))| SwitchRow { number: i + 1, prefix: it.prefix, icons: it.icons, label: it.display, dim: it.dim, off_space: it.off_space, current: it.current })
+                .collect();
             (rows, s.is_searching(), s.query().to_string(), s.selected())
         }) else {
             return;

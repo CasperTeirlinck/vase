@@ -50,6 +50,8 @@ pub struct Daemon {
     overlays: Overlays,
     /// Whether a window is fullscreen, so the overlays hide instead of sitting over it.
     fullscreen: bool,
+    /// Managed windows currently on another Space.
+    off_space: HashSet<WindowId>,
     /// Polls to skip OS-focus-following after our own focus command, so CGWindowList's lag on a just-raised window doesn't flip focus back (a flicker).
     focus_cooldown: u32,
     /// Last observed OS-frontmost window, so focus-follow is edge-triggered (fires only on a real change).
@@ -104,6 +106,7 @@ impl Daemon {
             reframe_deadline: None,
             overlays: Overlays::new(mtm),
             fullscreen: false,
+            off_space: HashSet::new(),
             focus_cooldown: 0,
             last_front: None,
             last_focused: None,
@@ -159,6 +162,7 @@ impl Daemon {
         let chrome = Chrome {
             windows: &self.windows,
             badges: &self.badges,
+            off_space: &self.off_space,
             hotkeys: &self.app_hotkeys,
             main_screen: self.main_screen,
             prefix_armed: self.prefix_armed,

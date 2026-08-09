@@ -9,7 +9,7 @@ use vase_core::geometry::Rect;
 
 use super::super::text::{app_icon, segment};
 use super::super::theme::*;
-use super::super::{BAR_HEIGHT, FONT_SIZE};
+use super::super::{BAR_HEIGHT, FONT_SIZE, SPACE_MARK};
 use super::paths::{tab_path, tab_path_cap_left};
 use super::{BarTab, TabBar};
 
@@ -40,7 +40,7 @@ impl TabBar {
 
         let mut cursor = lead_w;
         // Icons are separate NSImageViews, not label attachments: an attachment inside the label intermittently swallowed the text.
-        for (i, BarTab { icons: icon_apps, badges, label: label_text, zoomed, number, dim, hotkey }) in tabs.iter().enumerate() {
+        for (i, BarTab { icons: icon_apps, badges, label: label_text, zoomed, number, dim, off_space, hotkey }) in tabs.iter().enumerate() {
             // Pair each resolved icon with its badge flag; unresolved icons drop from both, staying aligned.
             let icons: Vec<(Retained<NSImage>, bool)> =
                 icon_apps.iter().zip(badges.iter().copied().chain(std::iter::repeat(false))).filter_map(|(a, badged)| app_icon(a).map(|img| (img, badged))).collect();
@@ -61,8 +61,13 @@ impl TabBar {
             }
             let tsize = text.size();
             let n = icons.len() as f64;
-            // Grey position number in front of the icon (the `prefix-N` shortcut).
-            let num_seg = segment(&format!("{number} "), &font, &dim_col(), None);
+            // Grey position number in front of the icon (the `prefix-N` shortcut), with a leading Space marker
+            let num_seg = NSMutableAttributedString::new();
+            if *off_space {
+                num_seg.appendAttributedString(&segment(SPACE_MARK, &font, &clay(), None));
+                num_seg.appendAttributedString(&segment(" ", &font, &dim_col(), None));
+            }
+            num_seg.appendAttributedString(&segment(&format!("{number} "), &font, &dim_col(), None));
             let num_w = num_seg.size().width;
             // A stack bar's first tab has a rounded-left cap, not a notch, so its content clears the cap plus a small pad.
             let cap_left = !main && i == 0;
@@ -166,7 +171,7 @@ impl TabBar {
             dot.setBoxType(NSBoxType::Custom);
             dot.setTitlePosition(NSTitlePosition::NoTitle);
             dot.setCornerRadius(dot_d / 2.0);
-            let dot_color = if armed { green() } else { dim_col() };
+            let dot_color = if armed { clay() } else { dim_col() };
             dot.setFillColor(&dot_color);
             dot.setBorderWidth(0.0);
             container.addSubview(&dot);

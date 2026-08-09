@@ -27,11 +27,7 @@ pub(crate) fn text_col() -> Retained<NSColor> {
 pub(crate) fn dim_col() -> Retained<NSColor> {
     theme_color(0.361, 0.388, 0.439, 1.0)
 }
-// One Dark green (#98c379), the armed-prefix dot.
-pub(crate) fn green() -> Retained<NSColor> {
-    theme_color(0.596, 0.765, 0.475, 1.0)
-}
-// vase brand terracotta (#C7663C), the leading logo mark.
+// vase brand terracotta (#C7663C): the logo mark, and the accent for every highlight.
 pub(crate) fn clay() -> Retained<NSColor> {
     theme_color(0.780, 0.400, 0.235, 1.0)
 }
@@ -47,7 +43,7 @@ pub(crate) fn tab_border() -> Retained<NSColor> {
 pub(crate) fn hotkey_border() -> Retained<NSColor> {
     theme_color(0.85, 0.87, 0.90, 0.95)
 }
-// The focused-pane accent (outline / placeholder border): One Dark green.
+// The focused-pane accent (outline / placeholder border): the vase accent.
 pub(crate) fn pane_border() -> Retained<NSColor> {
-    green()
+    clay()
 }

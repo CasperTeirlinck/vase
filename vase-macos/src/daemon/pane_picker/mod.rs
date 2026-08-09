@@ -14,9 +14,9 @@ use super::Daemon;
 #[derive(Clone)]
 pub enum PickItem {
     /// An existing window to move into the pane.
-    Window { id: WindowId, icons: Vec<String>, display: String, prefix: String, dim: bool },
+    Window { id: WindowId, icons: Vec<String>, display: String, prefix: String, dim: bool, off_space: bool },
     /// A tab/stack header: shown for context, not selectable.
-    Header { icons: Vec<String>, display: String, prefix: String, dim: bool },
+    Header { icons: Vec<String>, display: String, prefix: String, dim: bool, off_space: bool },
     /// Launch a new instance of `apps[i]`.
     Launch(usize),
 }
@@ -64,7 +64,8 @@ impl Daemon {
                     _ => {
                         let icons: Vec<String> = wins.iter().map(|w| self.windows.app(*w).to_string()).collect();
                         let display = tab.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| self.title_of(wins[0]));
-                        out.push((PickItem::Header { icons, display, prefix: String::new(), dim }, String::new()));
+                        let off_space = wins.iter().any(|w| self.off_space.contains(w));
+                        out.push((PickItem::Header { icons, display, prefix: String::new(), dim, off_space }, String::new()));
                         self.push_pick_children(&tab.root, dim, &exclude, &mut out);
                     }
                 }
@@ -114,7 +115,8 @@ impl Daemon {
                 }
                 Child::Stack { wins, selected } => {
                     let icons: Vec<String> = wins.iter().map(|w| self.windows.app(*w).to_string()).collect();
-                    out.push((PickItem::Header { icons, display: self.title_of(*selected), prefix: g1.to_string(), dim }, String::new()));
+                    let off_space = wins.iter().any(|w| self.off_space.contains(w));
+                    out.push((PickItem::Header { icons, display: self.title_of(*selected), prefix: g1.to_string(), dim, off_space }, String::new()));
                     let m = wins.len();
                     for (j, w) in wins.iter().enumerate() {
                         let g2 = if j + 1 == m { "   └─ " } else { "   ├─ " };
@@ -127,6 +129,6 @@ impl Daemon {
 
     fn pick_window(&self, id: WindowId, prefix: String, dim: bool) -> PickItem {
         let in_stack = !prefix.is_empty();
-        PickItem::Window { id, icons: vec![self.windows.app(id).to_string()], display: self.window_display(id, in_stack), prefix, dim }
+        PickItem::Window { id, icons: vec![self.windows.app(id).to_string()], display: self.window_display(id, in_stack), prefix, dim, off_space: self.off_space.contains(&id) }
     }
 }

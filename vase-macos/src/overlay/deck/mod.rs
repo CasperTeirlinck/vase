@@ -22,6 +22,8 @@ pub struct Chrome<'a> {
     pub windows: &'a Registry,
     /// Apps showing a Dock notification badge; drives the red dot on their tabs.
     pub badges: &'a HashSet<String>,
+    /// Managed windows on another Space; drives the Space marker on their tabs and rows.
+    pub off_space: &'a HashSet<vase_core::tree::WindowId>,
     /// Apps with a focus-toggle hotkey; their tabs get a marker.
     pub hotkeys: &'a [AppFocus],
     /// Display the tab bar lives on.

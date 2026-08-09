@@ -51,12 +51,14 @@ impl Daemon {
             .visible()
             .into_iter()
             .map(|(item, _)| match item {
-                PickItem::Window { icons, display, prefix, dim, .. } => {
+                PickItem::Window { icons, display, prefix, dim, off_space, .. } => {
                     n += 1;
-                    SwitchRow { number: n, prefix, icons, label: display, dim, current: false }
+                    SwitchRow { number: n, prefix, icons, label: display, dim, off_space, current: false }
                 }
-                PickItem::Header { icons, display, prefix, dim } => SwitchRow { number: 0, prefix, icons, label: display, dim, current: false },
-                PickItem::Launch(i) => SwitchRow { number: 0, prefix: String::new(), icons: vec![self.apps[i].clone()], label: format!("⧉  {}", self.apps[i]), dim: false, current: false },
+                PickItem::Header { icons, display, prefix, dim, off_space } => SwitchRow { number: 0, prefix, icons, label: display, dim, off_space, current: false },
+                PickItem::Launch(i) => {
+                    SwitchRow { number: 0, prefix: String::new(), icons: vec![self.apps[i].clone()], label: format!("⧉  {}", self.apps[i]), dim: false, off_space: false, current: false }
+                }
             })
             .collect();
         let header = if s.is_searching() { format!("/ {}", s.query()) } else { "move here - 1-9 pick · j/k · / search · ⏎ move · esc cancel".to_string() };

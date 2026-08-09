@@ -25,6 +25,9 @@ pub const BAR_HEIGHT: f64 = 22.0;
 
 pub(crate) const FONT_SIZE: f64 = 12.0;
 
+/// Leading marker on a tab or row whose window is on another (non-current) macOS Space.
+pub(crate) const SPACE_MARK: &str = "◇";
+
 /// Initialize NSApp as an accessory (no Dock icon) so AppKit windows render.
 pub fn nsapp_init(mtm: MainThreadMarker) {
     let app = NSApplication::sharedApplication(mtm);

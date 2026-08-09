@@ -22,9 +22,10 @@ pub struct BarTab {
     pub badges: Vec<bool>,  // parallel to `icons`: app has a Dock notification badge
     pub label: String,
     pub zoomed: bool,
-    pub number: usize, // 1-based position, shown grey; the `prefix-N` shortcut
-    pub dim: bool,     // on a non-focused monitor: whole tab dimmed but its border
-    pub hotkey: bool,  // app has a focus-toggle hotkey
+    pub number: usize,   // 1-based position, shown grey; the `prefix-N` shortcut
+    pub dim: bool,       // on a non-focused monitor: whole tab dimmed but its border
+    pub off_space: bool, // a window in the tab is on another Space
+    pub hotkey: bool,    // app has a focus-toggle hotkey
 }
 
 pub struct TabBar {

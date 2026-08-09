@@ -125,6 +125,7 @@ impl Daemon {
         let any_missing = model_ids.iter().any(|id| !current_ids.contains(id));
         let other_space: HashSet<WindowId> = if any_missing { crate::cg::all_windows().into_iter().map(|w| w.id).collect() } else { HashSet::new() };
 
+        let mut off_space: HashSet<WindowId> = HashSet::new();
         for id in model_ids {
             if current_ids.contains(&id) {
                 // Back on screen (or never left) → not minimized.
@@ -136,11 +137,17 @@ impl Daemon {
             if self.backend.minimized(id) == Some(true) {
                 self.windows.set_minimized(id, true);
             } else if other_space.contains(&id) {
+                off_space.insert(id);
                 continue;
             } else {
                 self.forget(id);
                 changed = true;
             }
+        }
+        // Redraw when the set of windows on another Space changes, so their tab/row marker appears and clears.
+        if off_space != self.off_space {
+            self.off_space = off_space;
+            self.refresh();
         }
         // Hide the overlays while the Space you're on shows a fullscreen window, so nothing is drawn over it. Key off
         // the frontmost window (always on the active Space), so a fullscreen video on another Space doesn't hide the

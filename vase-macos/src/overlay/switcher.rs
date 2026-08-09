@@ -9,7 +9,7 @@ use vase_core::geometry::Rect;
 use super::panel::Panel;
 use super::text::{icon_run, scroll_offset, segment};
 use super::theme::*;
-use super::FONT_SIZE;
+use super::{FONT_SIZE, SPACE_MARK};
 
 const SWITCHER_ROW_H: f64 = 28.0;
 const SWITCHER_WIDTH: f64 = 640.0;
@@ -21,8 +21,9 @@ pub struct SwitchRow {
     pub prefix: String,
     pub icons: Vec<String>,
     pub label: String,
-    pub dim: bool,     // on a non-focused monitor
-    pub current: bool, // the currently-focused window
+    pub dim: bool,       // on a non-focused monitor
+    pub off_space: bool, // the window is on another Space
+    pub current: bool,   // the currently-focused window
 }
 
 /// Where a list is framed and how its card is trimmed. The two framings differ only in these values; everything below the card is drawn the same way.
@@ -118,7 +119,9 @@ impl SwitcherView {
         let inner_w = (w - 2.0 * PANE_PAD).max(0.0);
         let top = h - PANE_PAD;
         let qy = top - SWITCHER_ROW_H;
-        let qlabel = self.make_label(0, "", &[], header, true, false, PANE_PAD, qy, inner_w);
+        // Reserve the marker gutter on every row once any row is off-Space, so index numbers stay column-aligned.
+        let reserve = items.iter().any(|r| r.off_space);
+        let qlabel = self.make_label(0, "", &[], header, true, false, false, reserve, PANE_PAD, qy, inner_w);
         container.addSubview(&qlabel);
         labels.push(qlabel);
 
@@ -131,11 +134,11 @@ impl SwitcherView {
                 let (hx, hw) = frame.highlight;
                 container.addSubview(&self.bar(hx, ry, hw, &active_bg()));
             }
-            // Green left accent marks the focused window, so it stays marked as the selection moves away.
+            // Clay left accent marks the focused window, so it stays marked as the selection moves away.
             if frame.accent && row.current {
-                container.addSubview(&self.bar(1.0, ry, 3.0, &green()));
+                container.addSubview(&self.bar(1.0, ry, 3.0, &clay()));
             }
-            let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, row.dim, PANE_PAD, ry, inner_w);
+            let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, row.dim, row.off_space, reserve, PANE_PAD, ry, inner_w);
             container.addSubview(&label);
             labels.push(label);
         }
@@ -145,11 +148,16 @@ impl SwitcherView {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn make_label(&self, number: usize, prefix: &str, icons: &[String], text: &str, is_query: bool, dim: bool, x: f64, y: f64, width: f64) -> Retained<NSTextField> {
-        // Content order: grey index number, tree glyph, app icons, then text.
+    fn make_label(&self, number: usize, prefix: &str, icons: &[String], text: &str, is_query: bool, dim: bool, off_space: bool, reserve: bool, x: f64, y: f64, width: f64) -> Retained<NSTextField> {
+        // Content order: Space-marker gutter, grey index number, tree glyph, app icons, then text.
         let font = NSFont::monospacedSystemFontOfSize_weight(FONT_SIZE, 0.0);
         let text_color = if is_query { dim_col() } else { text_col() };
         let combined = NSMutableAttributedString::new();
+        // Leading gutter (a clay Space marker, or a blank cell to keep numbers aligned) when any row in the list is off-Space.
+        if reserve {
+            combined.appendAttributedString(&segment(if off_space { SPACE_MARK } else { " " }, &font, &clay(), None));
+            combined.appendAttributedString(&segment(" ", &font, &text_color, None));
+        }
         if number > 0 {
             // Right-aligned in a 2-wide gutter so single/double digits line up.
             combined.appendAttributedString(&segment(&format!("{number:>2} "), &font, &dim_col(), None));
