@@ -111,17 +111,23 @@ impl MacBackend {
     pub fn minimized(&mut self, window: WindowId) -> Option<bool> {
         let info = self.known.get(&window).cloned()?;
         let el = self.resolve(&info)?;
-        unsafe { read_minimized(el) }
+        unsafe { read_bool_attr(el, "AXMinimized") }
     }
 
     /// Like `minimized`, but for an untracked window; remembers it on success.
     pub fn minimized_info(&mut self, info: &WindowInfo) -> Option<bool> {
         let el = self.resolve(info)?;
-        let m = unsafe { read_minimized(el) };
+        let m = unsafe { read_bool_attr(el, "AXMinimized") };
         if m.is_some() {
             self.known.entry(info.id).or_insert_with(|| info.clone());
         }
         m
+    }
+
+    /// Whether the window is in native macOS fullscreen (its own Space); `None` if it can't be read.
+    pub fn fullscreen(&mut self, info: &WindowInfo) -> Option<bool> {
+        let el = self.resolve(info)?;
+        unsafe { read_bool_attr(el, "AXFullScreen") }
     }
 
     /// Minimize (`true`) or restore (`false`) the window via `AXMinimized`.
@@ -142,8 +148,8 @@ impl Default for MacBackend {
     }
 }
 
-unsafe fn read_minimized(el: AXUIElementRef) -> Option<bool> {
-    let attr = CFString::from_static_string("AXMinimized");
+unsafe fn read_bool_attr(el: AXUIElementRef, name: &'static str) -> Option<bool> {
+    let attr = CFString::from_static_string(name);
     let mut value: CFTypeRef = std::ptr::null();
     let err = AXUIElementCopyAttributeValue(el, attr.as_concrete_TypeRef(), &mut value);
     if err != kAXErrorSuccess || value.is_null() {

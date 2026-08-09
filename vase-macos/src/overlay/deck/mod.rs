@@ -85,4 +85,12 @@ impl Overlays {
             bar.hide();
         }
     }
+
+    /// Hide every overlay surface.
+    pub fn hide_all(&self) {
+        self.hide_bars();
+        self.panes.hide();
+        self.focus_border.hide();
+        self.list.hide();
+    }
 }

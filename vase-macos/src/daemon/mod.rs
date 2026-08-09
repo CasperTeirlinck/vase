@@ -48,6 +48,8 @@ pub struct Daemon {
     badge_tick: u32,
     /// Everything vase paints on top of the windows.
     overlays: Overlays,
+    /// Whether a window is fullscreen, so the overlays hide instead of sitting over it.
+    fullscreen: bool,
     /// Polls to skip OS-focus-following after our own focus command, so CGWindowList's lag on a just-raised window doesn't flip focus back (a flicker).
     focus_cooldown: u32,
     /// Last observed OS-frontmost window, so focus-follow is edge-triggered (fires only on a real change).
@@ -101,6 +103,7 @@ impl Daemon {
             pending_reframe: Vec::new(),
             reframe_deadline: None,
             overlays: Overlays::new(mtm),
+            fullscreen: false,
             focus_cooldown: 0,
             last_front: None,
             last_focused: None,
@@ -145,6 +148,11 @@ impl Daemon {
 
     /// Redraw every overlay from the current model. The one place that knows what a change redraws.
     pub fn refresh(&mut self) {
+        // A fullscreen window owns the whole display; hide every overlay so nothing sits over it.
+        if self.fullscreen {
+            self.overlays.hide_all();
+            return;
+        }
         // The picker may open or close here, and the pane placeholders depend on whether it did.
         self.refresh_pane_picker();
         let Some(model) = &self.model else { return };

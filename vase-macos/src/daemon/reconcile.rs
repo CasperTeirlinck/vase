@@ -119,19 +119,36 @@ impl Daemon {
                 changed = true;
             }
         }
+        // A window off the on-screen list may just be on another Space (a native-fullscreen window lives on its
+        // own Space, moving the rest off-screen), not closed. Fetch the all-Spaces list to tell them apart, only
+        // when something is actually missing so the common quiet poll skips the extra CGWindowList call.
+        let any_missing = model_ids.iter().any(|id| !current_ids.contains(id));
+        let other_space: HashSet<WindowId> = if any_missing { crate::cg::all_windows().into_iter().map(|w| w.id).collect() } else { HashSet::new() };
+
         for id in model_ids {
             if current_ids.contains(&id) {
                 // Back on screen (or never left) → not minimized.
                 self.windows.set_minimized(id, false);
                 continue;
             }
-            // Off the on-screen list: minimized windows keep their tab; an unreadable window is closed, remove it.
+            // Off the on-screen list: minimized windows keep their tab; a window still on another Space keeps its
+            // tab too; only a window gone from every Space is really closed, so remove it.
             if self.backend.minimized(id) == Some(true) {
                 self.windows.set_minimized(id, true);
+            } else if other_space.contains(&id) {
+                continue;
             } else {
                 self.forget(id);
                 changed = true;
             }
+        }
+        // Hide the overlays while the Space you're on shows a fullscreen window, so nothing is drawn over it. Key off
+        // the frontmost window (always on the active Space), so a fullscreen video on another Space doesn't hide the
+        // bar on the Space you're actually looking at.
+        let fullscreen = current.first().and_then(|w| self.backend.fullscreen(w)).unwrap_or(false);
+        if fullscreen != self.fullscreen {
+            self.fullscreen = fullscreen;
+            self.refresh();
         }
 
         // Keep titles live via Accessibility (kCGWindowName is stale/empty); redraw the bar on a change.
