@@ -13,7 +13,7 @@ fn break_pane_from_a_stack_in_a_split_keeps_the_rest_in_the_split() {
         screens: vec![Screen { rect: SCREEN, tabs: vec![Tab { root, focused: PaneId(2), name: None }], current: 0 }],
         focused_screen: 0,
         zoomed: false,
-        stack_names: HashMap::new(),
+        names: HashMap::new(),
         next_pane_id: 3,
     };
     let (m, _) = apply(m, Command::BreakPane);
@@ -35,8 +35,8 @@ fn break_pane_from_a_stack_in_a_split_keeps_the_rest_in_the_split() {
 fn break_pane_from_a_plain_stack_tab_pops_the_item_and_keeps_its_name() {
     use std::collections::HashMap;
     // A whole-tab stack of two windows, win 2 selected and named "editor".
-    let mut stack_names = HashMap::new();
-    stack_names.insert(win(2), "editor".to_string());
+    let mut names = HashMap::new();
+    names.insert(win(2), "editor".to_string());
     let m = Model {
         screens: vec![Screen {
             rect: SCREEN,
@@ -45,17 +45,17 @@ fn break_pane_from_a_plain_stack_tab_pops_the_item_and_keeps_its_name() {
         }],
         focused_screen: 0,
         zoomed: false,
-        stack_names,
+        names,
         next_pane_id: 1,
     };
     let (m, _) = apply(m, Command::BreakPane);
     assert_eq!(m.screens[0].tabs.len(), 2);
     // The stack collapses to its remaining window (win 1).
     assert_eq!(m.screens[0].tabs[0].root, Node::Leaf { id: PaneId(0), pane: Pane::Window(win(1)) });
-    // win 2 pops to its own tab and keeps the name it had in the stack.
+    // win 2 pops to its own tab and keeps its name, which stays keyed by the window (not moved onto the tab).
     assert_eq!(m.screens[0].tabs[1].root, Node::Leaf { id: PaneId(1), pane: Pane::Window(win(2)) });
-    assert_eq!(m.screens[0].tabs[1].name.as_deref(), Some("editor"));
-    assert!(m.stack_names.is_empty()); // the name moved to the tab
+    assert_eq!(m.screens[0].tabs[1].name, None);
+    assert_eq!(m.names.get(&win(2)), Some(&"editor".to_string()));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn cancel_stackify_on_a_split_pane_keeps_focus_on_that_pane() {
         screens: vec![Screen { rect: SCREEN, tabs: vec![Tab { root, focused: PaneId(2), name: None }], current: 0 }],
         focused_screen: 0,
         zoomed: false,
-        stack_names: HashMap::new(),
+        names: HashMap::new(),
         next_pane_id: 3,
     };
     let (m, _) = apply(m, Command::Stackify); // win2 → stack with an empty slot

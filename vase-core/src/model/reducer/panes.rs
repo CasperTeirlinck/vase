@@ -136,11 +136,11 @@ pub(super) fn break_pane(mut model: Model) -> (Model, Vec<Effect>) {
         let ls = leaves(&tab.root);
         tab.focused = ls.iter().find(|(_, p)| matches!(p, Pane::Window(_))).map(|(id, _)| *id).unwrap_or(ls[0].0);
     }
-    // A window pane pops out to its own new tab (carrying any custom name); an empty pane just vanishes. Focus stays on the current tab.
+    // A window pane pops out to its own new tab; an empty pane just vanishes. Its custom name lives in `names`,
+    // keyed by the window, so it follows the window without any transfer here. Focus stays on the current tab.
     if let Some(Pane::Window(w)) = pane {
-        let name = model.stack_names.remove(&w);
         let pid = model.next_id();
-        model.screens[fsi].tabs.push(Tab { root: Node::Leaf { id: pid, pane: Pane::Window(w) }, focused: pid, name });
+        model.screens[fsi].tabs.push(Tab { root: Node::Leaf { id: pid, pane: Pane::Window(w) }, focused: pid, name: None });
     }
     let effects = render_and_focus(&model);
     (model, effects)

@@ -62,7 +62,7 @@ fn stack_select_and_move_and_name() {
     assert!(matches!(m.screens[0].tabs[0].root, Node::Stack { selected: 0, .. }));
     // Name the selected item, then reorder it down.
     let (m, _) = apply(m, Command::SetStackName(Some("editor".into())));
-    assert_eq!(m.stack_names.get(&win(1)), Some(&"editor".to_string()));
+    assert_eq!(m.names.get(&win(1)), Some(&"editor".to_string()));
     let (m, _) = apply(m, Command::StackMove(1)); // W1 moves to index 1, stays selected
     assert_eq!(m.screens[0].tabs[0].root, stack(vec![Pane::Window(win(2)), Pane::Window(win(1))], 1));
 }

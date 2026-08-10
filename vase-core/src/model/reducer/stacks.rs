@@ -62,10 +62,10 @@ pub(super) fn set_stack_name(mut model: Model, name: Option<String>) -> (Model, 
     };
     match name {
         Some(n) => {
-            model.stack_names.insert(wid, n);
+            model.names.insert(wid, n);
         }
         None => {
-            model.stack_names.remove(&wid);
+            model.names.remove(&wid);
         }
     }
     (model, vec![])

@@ -151,7 +151,6 @@ impl Daemon {
     }
 
     fn pick_window(&self, id: WindowId, prefix: String, dim: bool) -> PickItem {
-        let in_stack = !prefix.is_empty();
-        PickItem::Window { id, icons: vec![self.windows.app(id).to_string()], display: self.window_display(id, in_stack), prefix, dim, off_space: self.off_space.contains(&id) }
+        PickItem::Window { id, icons: vec![self.windows.app(id).to_string()], display: self.window_display(id), prefix, dim, off_space: self.off_space.contains(&id) }
     }
 }

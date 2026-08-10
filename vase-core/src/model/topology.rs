@@ -7,7 +7,7 @@ impl Model {
     /// One single-pane tab per window, on its paired screen index.
     pub fn adopt(screens: &[Rect], windows: &[(WindowId, usize)]) -> Model {
         if screens.is_empty() {
-            return Model { screens: vec![], focused_screen: 0, zoomed: false, stack_names: HashMap::new(), next_pane_id: 0 };
+            return Model { screens: vec![], focused_screen: 0, zoomed: false, names: HashMap::new(), next_pane_id: 0 };
         }
         let mut model_screens: Vec<Screen> = screens.iter().map(|rect| Screen { rect: *rect, tabs: vec![], current: 0 }).collect();
         let mut next = 0u64;
@@ -16,7 +16,7 @@ impl Model {
             next += 1;
             model_screens[*si].tabs.push(Tab { root: Node::Leaf { id, pane: Pane::Window(*w) }, focused: id, name: None });
         }
-        Model { screens: model_screens, focused_screen: 0, zoomed: false, stack_names: HashMap::new(), next_pane_id: next }
+        Model { screens: model_screens, focused_screen: 0, zoomed: false, names: HashMap::new(), next_pane_id: next }
     }
 
     /// Append `w` as a new single-pane tab on `screen`, without moving focus.
@@ -39,7 +39,7 @@ impl Model {
                 remap_node(&mut tab.root, map);
             }
         }
-        self.stack_names = std::mem::take(&mut self.stack_names).into_iter().filter_map(|(k, v)| Some((*map.get(&k)?, v))).collect();
+        self.names = std::mem::take(&mut self.names).into_iter().filter_map(|(k, v)| Some((*map.get(&k)?, v))).collect();
     }
 
     /// Drop `Window` leaves absent from `live` and any tab left empty.

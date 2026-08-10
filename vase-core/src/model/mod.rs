@@ -49,9 +49,10 @@ pub struct Model {
     pub focused_screen: usize,
     /// The focused screen's focused window fills that screen.
     pub zoomed: bool,
-    /// Custom names for windows shown as stack items.
-    #[serde(default)]
-    pub stack_names: HashMap<WindowId, String>,
+    /// Custom name per window,
+    /// keyed by window so it survives splits, moves, and stacks.
+    #[serde(default, alias = "stack_names")]
+    pub names: HashMap<WindowId, String>,
     /// Monotonic `PaneId` allocator.
     pub next_pane_id: u64,
 }

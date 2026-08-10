@@ -86,7 +86,7 @@ impl Overlays {
                 .map(|(i, id)| {
                     let app = chrome.windows.app(*id).to_string();
                     // A custom nested-tab name overrides the window title.
-                    let label = match model.stack_names.get(id) {
+                    let label = match model.names.get(id) {
                         Some(name) => name.clone(),
                         None => {
                             let ct = clean_title(chrome.windows.title(*id), &app);

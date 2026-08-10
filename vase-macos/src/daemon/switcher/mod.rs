@@ -146,12 +146,11 @@ impl Daemon {
 
     /// A window row: a single app icon and the window's display name.
     fn win_item(&self, id: WindowId, prefix: String, dim: bool, focused: Option<WindowId>) -> SwitchItem {
-        let in_stack = !prefix.is_empty();
         SwitchItem {
             target: SwitchTarget::Window(id),
             prefix,
             icons: vec![self.windows.app(id).to_string()],
-            display: self.window_display(id, in_stack),
+            display: self.window_display(id),
             dim,
             off_space: self.off_space.contains(&id),
             current: Some(id) == focused,
