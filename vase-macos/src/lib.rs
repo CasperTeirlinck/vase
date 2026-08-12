@@ -1,13 +1,11 @@
 pub mod ax;
 pub mod cg;
-pub mod config;
 pub mod daemon;
 pub mod dock;
 pub mod event_tap;
-pub mod keymap;
+pub mod keycode;
 pub mod overlay;
-pub mod registry;
-pub mod state;
+pub mod paths;
 pub mod status;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -42,8 +40,4 @@ pub fn take_reload_config() -> bool {
 
 pub use ax::MacBackend;
 pub use event_tap::EventTap;
-pub use overlay::{nsapp_init, BarTab, FocusBorder, PaneOverlay, SwitcherView, TabBar};
-
-#[cfg(test)]
-#[path = "../tests/unit/mod.rs"]
-mod tests;
+pub use overlay::{nsapp_init, FocusBorder, PaneOverlay, SwitcherView, TabBar};

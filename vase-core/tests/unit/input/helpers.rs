@@ -27,12 +27,12 @@ pub fn sw() -> Switcher<Row> {
     Switcher::new(vec![(Row::Win(1), "Ghostty".into()), (Row::Win(2), "Google Chrome".into()), (Row::Win(3), "Obsidian".into())])
 }
 
-pub fn press(s: &mut Switcher<Row>, code: u16) -> Pick<Row> {
+pub fn press(s: &mut Switcher<Row>, code: KeyCode) -> Pick<Row> {
     s.key(Key::plain(code), t0())
 }
 
 pub fn ch(s: &mut Switcher<Row>, c: char) -> Pick<Row> {
-    press(s, key_code_for_name(&c.to_string()).unwrap())
+    press(s, KeyCode::Char(c))
 }
 
 pub fn ids(s: &Switcher<Row>) -> Vec<Row> {

@@ -4,10 +4,11 @@ use std::time::Instant;
 
 use vase_core::input::{Key, Pick};
 use vase_core::model::Command;
+use vase_core::registry::clean_title;
 use vase_core::tree::{windows, WindowId};
 
 use super::SwitchTarget;
-use crate::daemon::{clean_title, Daemon};
+use crate::daemon::Daemon;
 use crate::overlay::SwitchRow;
 
 impl Daemon {
@@ -70,7 +71,16 @@ impl Daemon {
                 .visible()
                 .into_iter()
                 .enumerate()
-                .map(|(i, (it, _))| SwitchRow { number: i + 1, prefix: it.prefix, icons: it.icons, label: it.display, dim: it.dim, off_space: it.off_space, favorite: false, current: it.current })
+                .map(|(i, (it, _))| SwitchRow {
+                    number: i + 1,
+                    prefix: it.prefix,
+                    icons: it.icons,
+                    label: it.display,
+                    dim: it.dim,
+                    off_workspace: it.off_workspace,
+                    favorite: false,
+                    current: it.current,
+                })
                 .collect();
             (rows, s.is_searching(), s.query().to_string(), s.selected())
         }) else {

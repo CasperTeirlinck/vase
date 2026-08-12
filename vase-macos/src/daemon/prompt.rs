@@ -1,6 +1,7 @@
 //! The bar command line (tab rename and `:` command), vim-style, and the small `:` verb set it runs.
 
-use vase_core::input::Key;
+use vase_core::backend::Backend;
+use vase_core::input::{Key, KeyCode};
 use vase_core::model::Command;
 
 use super::Daemon;
@@ -55,10 +56,9 @@ impl Daemon {
 
     /// Handle a key while the command line is open (modal): Enter runs, Esc cancels, Delete backspaces, else append.
     pub fn prompt_key(&mut self, key: Key) -> bool {
-        use vase_core::input::keys::{char_for_keycode, VK_DELETE, VK_ESC, VK_RETURN};
         let Some((kind, _)) = &self.prompt else { return false };
         let code = key.code;
-        if code == VK_RETURN {
+        if code == KeyCode::Return {
             let (kind, buf) = self.prompt.take().unwrap();
             match kind {
                 // Empty clears (auto title returns); a whitespace-only name is kept so the tab shows just its icon.
@@ -71,16 +71,16 @@ impl Daemon {
             }
             return true;
         }
-        if code == VK_ESC {
+        if code == KeyCode::Escape {
             self.close_prompt();
             return true;
         }
         let _ = kind;
         let (_, buf) = self.prompt.as_mut().unwrap();
-        if code == VK_DELETE {
+        if code == KeyCode::Backspace {
             buf.pop();
-        } else if !key.mods.cmd && !key.mods.ctrl && !key.mods.alt {
-            if let Some(c) = char_for_keycode(key.code) {
+        } else if key.mods.is_typing() {
+            if let Some(c) = key.code.char() {
                 buf.push(if key.mods.shift { c.to_ascii_uppercase() } else { c });
             }
         }

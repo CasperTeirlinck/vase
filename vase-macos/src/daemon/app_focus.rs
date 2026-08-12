@@ -2,8 +2,8 @@
 
 use vase_core::input::Key;
 use vase_core::model::Command;
+use vase_core::registry::app_matches;
 
-use super::util::{all_windows, app_matches};
 use super::Daemon;
 
 impl Daemon {
@@ -14,10 +14,11 @@ impl Daemon {
 
     /// Re-read config.toml and apply it (the menu-bar "Reload config" action).
     pub fn reload_config(&mut self) {
-        self.app_hotkeys = crate::config::load();
-        self.favorites = crate::config::favorites();
-        crate::overlay::set_theme(crate::config::load_theme());
-        crate::overlay::set_mark(crate::config::load_mark());
+        let config = crate::paths::load_config();
+        self.app_hotkeys = config.app_focus;
+        self.favorites = config.favorites;
+        vase_core::chrome::theme::set_theme(config.theme);
+        vase_core::chrome::theme::set_mark(config.mark);
         self.refresh(); // palette, mark, and hotkey/favorite markers may have changed
     }
 
@@ -31,7 +32,7 @@ impl Daemon {
             }
             return;
         }
-        let first = all_windows(model).into_iter().find(|id| app_matches(self.windows.app(*id), app));
+        let first = model.all_windows().into_iter().find(|id| app_matches(self.windows.app(*id), app));
         if let Some(id) = first {
             self.dispatch(Command::Raise(id));
         }

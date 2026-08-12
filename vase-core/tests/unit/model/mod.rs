@@ -1,5 +1,5 @@
 use crate::focus::Direction;
-use crate::geometry::{Rect, STACK_BAR_H};
+use crate::geometry::{Rect, BAR_HEIGHT};
 use crate::model::*;
 use crate::tree::{windows, Dir, Node, Pane, PaneId, WindowId};
 use std::collections::{HashMap, HashSet};

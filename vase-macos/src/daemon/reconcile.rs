@@ -3,17 +3,16 @@
 use std::collections::{HashMap, HashSet};
 
 use vase_core::backend::{manageable, Backend, WindowInfo};
-use vase_core::geometry::Rect;
+use vase_core::geometry::{screen_of, Rect};
 use vase_core::model::{Command, Effect, Screen, Tab};
 use vase_core::tree::WindowId;
 
-use super::util::{all_windows, screen_of};
 use super::Daemon;
 
 impl Daemon {
     /// Pull each managed window's current title via Accessibility; returns whether any changed.
     fn refresh_titles(&mut self) -> bool {
-        let ids = all_windows(self.model.as_ref().unwrap());
+        let ids = self.model.as_ref().unwrap().all_windows();
         let mut changed = false;
         for id in ids {
             if let Some(t) = self.backend.title(id) {
@@ -48,13 +47,12 @@ impl Daemon {
 
     /// Detect a display reconfiguration (hotplug / resolution change) and rebuild the model's screens, matched by stable display id.
     fn reconcile_screens(&mut self) {
-        let mut screens = crate::overlay::all_screens(self.mtm);
-        if screens.is_empty() {
+        let displays = self.backend.displays();
+        if displays.is_empty() {
             return;
         }
-        screens.sort_by(|a, b| a.1.x.partial_cmp(&b.1.x).unwrap_or(std::cmp::Ordering::Equal).then(a.1.y.partial_cmp(&b.1.y).unwrap_or(std::cmp::Ordering::Equal)));
-        let new_ids: Vec<u32> = screens.iter().map(|(id, _, _)| *id).collect();
-        let new_cg: Vec<Rect> = screens.iter().map(|(_, full, _)| *full).collect();
+        let new_ids: Vec<u32> = displays.iter().map(|d| d.id).collect();
+        let new_cg: Vec<Rect> = displays.iter().map(|d| d.bounds).collect();
         if new_ids == self.display_ids && new_cg == self.screens_cg {
             return; // no change
         }
@@ -63,10 +61,10 @@ impl Daemon {
         let Some(model) = self.model.as_mut() else { return };
         // Index old Screens by display id, rebuild in the new order, carrying surviving tabs.
         let mut old_by_id: HashMap<u32, Screen> = self.display_ids.iter().copied().zip(std::mem::take(&mut model.screens)).collect();
-        let mut new_screens: Vec<Screen> = Vec::with_capacity(screens.len());
-        for (i, (id, _, vis)) in screens.iter().enumerate() {
-            let rect = if i == main_screen { Rect::new(vis.x, vis.y, vis.w, vis.h - crate::overlay::BAR_HEIGHT) } else { *vis };
-            let screen = match old_by_id.remove(id) {
+        let mut new_screens: Vec<Screen> = Vec::with_capacity(displays.len());
+        for (i, display) in displays.iter().enumerate() {
+            let rect = crate::overlay::usable(display.work_area, i == main_screen);
+            let screen = match old_by_id.remove(&display.id) {
                 Some(mut s) => {
                     s.rect = rect;
                     s.current = s.current.min(s.tabs.len().saturating_sub(1));
@@ -104,7 +102,7 @@ impl Daemon {
         self.reconcile_screens();
         let current: Vec<_> = self.backend.list_windows().into_iter().filter(manageable).collect();
         let current_ids: HashSet<WindowId> = current.iter().map(|w| w.id).collect();
-        let model_ids: Vec<WindowId> = all_windows(self.model.as_ref().unwrap());
+        let model_ids: Vec<WindowId> = self.model.as_ref().unwrap().all_windows();
         let model_set: HashSet<WindowId> = model_ids.iter().copied().collect();
 
         let mut changed = false;
@@ -112,7 +110,7 @@ impl Daemon {
             if !model_set.contains(&w.id) {
                 // Only tile standard windows: a transient popup (download bubble, panel) reports a non-standard AX subrole and adopting one causes a focus/re-tile flicker loop.
                 // Fail open when the subrole can't be read (re-checked each poll).
-                if self.backend.subrole_info(w).is_some_and(|s| s != "AXStandardWindow") {
+                if self.backend.tileable(w) == Some(false) {
                     continue;
                 }
                 self.adopt(w);
@@ -123,9 +121,9 @@ impl Daemon {
         // own Space, moving the rest off-screen), not closed. Fetch the all-Spaces list to tell them apart, only
         // when something is actually missing so the common quiet poll skips the extra CGWindowList call.
         let any_missing = model_ids.iter().any(|id| !current_ids.contains(id));
-        let other_space: HashSet<WindowId> = if any_missing { crate::cg::all_windows().into_iter().map(|w| w.id).collect() } else { HashSet::new() };
+        let elsewhere: HashSet<WindowId> = if any_missing { self.backend.all_windows().into_iter().map(|w| w.id).collect() } else { HashSet::new() };
 
-        let mut off_space: HashSet<WindowId> = HashSet::new();
+        let mut off_workspace: HashSet<WindowId> = HashSet::new();
         for id in model_ids {
             if current_ids.contains(&id) {
                 // Back on screen (or never left) → not minimized.
@@ -136,8 +134,8 @@ impl Daemon {
             // tab too; only a window gone from every Space is really closed, so remove it.
             if self.backend.minimized(id) == Some(true) {
                 self.windows.set_minimized(id, true);
-            } else if other_space.contains(&id) {
-                off_space.insert(id);
+            } else if elsewhere.contains(&id) {
+                off_workspace.insert(id);
                 continue;
             } else {
                 self.forget(id);
@@ -145,8 +143,8 @@ impl Daemon {
             }
         }
         // Redraw when the set of windows on another Space changes, so their tab/row marker appears and clears.
-        if off_space != self.off_space {
-            self.off_space = off_space;
+        if off_workspace != self.off_workspace {
+            self.off_workspace = off_workspace;
             self.refresh();
         }
         // Hide the overlays while the Space you're on shows a fullscreen window, so nothing is drawn over it. Key off
@@ -201,7 +199,7 @@ impl Daemon {
         if self.badge_tick % 5 != 0 {
             return; // ~every 5th reconcile (~500 ms)
         }
-        let badges = crate::dock::badged_apps();
+        let badges = self.backend.badged_apps();
         if badges != self.badges {
             self.badges = badges;
             self.refresh();

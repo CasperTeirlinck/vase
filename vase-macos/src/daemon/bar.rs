@@ -2,8 +2,7 @@
 
 use std::time::Instant;
 
-use vase_core::input::keys::{char_for_keycode, VK_ESC};
-use vase_core::input::{Entry, Key, Mods};
+use vase_core::input::{Entry, Key, KeyCode, Mods};
 use vase_core::model::Command;
 
 use super::Daemon;
@@ -33,7 +32,7 @@ impl Daemon {
             return false;
         }
         if key.mods == Mods::default() {
-            if let Some(d) = char_for_keycode(key.code).and_then(|c| c.to_digit(10)) {
+            if let Some(d) = key.code.char().and_then(|c| c.to_digit(10)) {
                 let max = self.total_tabs();
                 if let Entry::Commit(n) = self.tab_entry.digit(d as usize, max, Instant::now()) {
                     self.select_bar_tab(n);
@@ -42,7 +41,7 @@ impl Daemon {
             }
         }
         // Unlike an open switcher, a non-digit key here commits rather than discards: no list is on screen, so the digits already typed are the whole of the user's intent.
-        if key.code == VK_ESC {
+        if key.code == KeyCode::Escape {
             self.tab_entry.cancel();
         } else if let Entry::Commit(n) = self.tab_entry.flush() {
             self.select_bar_tab(n);

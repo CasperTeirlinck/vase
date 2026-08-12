@@ -1,12 +1,11 @@
 //! Low-level powerline path/geometry builders and the panel layout scaffolding.
 
-use std::sync::LazyLock;
-
 use objc2::rc::Retained;
 use objc2::MainThreadOnly;
 use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBezierPath, NSFont, NSTextField, NSView};
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_quartz_core::{CALayer, CAShapeLayer};
+use vase_core::chrome::theme::vase_mark;
 use vase_core::geometry::Rect;
 
 use super::super::text::segment;
@@ -15,35 +14,14 @@ use super::super::{BAR_HEIGHT, FONT_SIZE};
 use super::TabBar;
 
 /// `begin`'s handles: `(container, content_view, content_layer, lead_w, glyph_label)`.
-/// `glyph_label` is a user-glyph mark the caller must retain; `None` for the logo, a hidden, or a stack bar.
+/// `glyph_label` is a user-glyph mark the caller must retain.
 type BarParts = (Retained<NSView>, Retained<NSView>, Retained<CALayer>, f64, Option<Retained<NSTextField>>);
-
-/// The vase brand mark parsed from docs/branding/vase-mark.svg: silhouette polygon normalized to a 0..1 box (`y` top→bottom), plus its aspect (width / height).
-struct VaseMark {
-    points: Vec<(f64, f64)>,
-    aspect: f64,
-}
-
-static VASE_MARK: LazyLock<VaseMark> = LazyLock::new(|| {
-    let svg = include_str!("../../../../docs/branding/vase-mark.svg");
-    let attr = |name: &str| svg.split_once(&format!("{name}=\"")).unwrap().1.split_once('"').unwrap().0;
-    let view_box: Vec<f64> = attr("viewBox").split_whitespace().map(|n| n.parse().unwrap()).collect();
-    let (w, h) = (view_box[2], view_box[3]);
-    let points = attr("points")
-        .split_whitespace()
-        .map(|pt| {
-            let (px, py) = pt.split_once(',').unwrap();
-            (px.parse::<f64>().unwrap() / w, py.parse::<f64>().unwrap() / h)
-        })
-        .collect();
-    VaseMark { points, aspect: w / h }
-});
 
 /// The vase brand mark as a bezier path filling the box `[x, x+w] × [y, y+h]`; normalized `y` is flipped so the vase stands up (bottom-left origin).
 pub(crate) fn vase_mark_bezier(x: f64, y: f64, w: f64, h: f64) -> Retained<NSBezierPath> {
     let path = NSBezierPath::new();
-    for (i, (nx, ny)) in VASE_MARK.points.iter().enumerate() {
-        let p = NSPoint::new(x + nx * w, y + (1.0 - ny) * h);
+    for (i, (px, py)) in vase_mark().polygon(Rect::new(x, y, w, h)).into_iter().enumerate() {
+        let p = NSPoint::new(px, py);
         if i == 0 {
             path.moveToPoint(p);
         } else {
@@ -110,7 +88,7 @@ impl TabBar {
             // The vase silhouette in the accent color, centered in the pill's glyph slot.
             None => {
                 let mark_h = BAR_HEIGHT - 8.0;
-                let mark_w = mark_h * VASE_MARK.aspect;
+                let mark_w = mark_h * vase_mark().aspect;
                 let mark_x = cap + 3.0 + (glyph_w - mark_w) / 2.0;
                 let mark_y = (BAR_HEIGHT - mark_h) / 2.0;
                 let vase = CAShapeLayer::new();
@@ -198,16 +176,4 @@ fn lead_path(lead_w: f64, r: f64, h: f64) -> Retained<NSBezierPath> {
     path.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise(NSPoint::new(cap, cy), cap, 90.0, 270.0, false);
     path.closePath();
     path
-}
-
-#[cfg(test)]
-mod tests {
-    use super::VASE_MARK;
-
-    #[test]
-    fn vase_mark_svg_parses() {
-        assert!(VASE_MARK.points.len() > 10);
-        assert!((VASE_MARK.aspect - 677.0 / 744.0).abs() < 1e-9);
-        assert!(VASE_MARK.points.iter().all(|&(x, y)| (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y)));
-    }
 }

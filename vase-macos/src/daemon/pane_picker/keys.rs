@@ -2,8 +2,8 @@
 
 use std::time::Instant;
 
+use vase_core::backend::Backend;
 use vase_core::backend::WindowInfo;
-use vase_core::input::keys::char_for_keycode;
 use vase_core::input::{Key, Mods, Pick, Switcher};
 use vase_core::model::Command;
 
@@ -52,18 +52,18 @@ impl Daemon {
             .visible()
             .into_iter()
             .map(|(item, _)| match item {
-                PickItem::Window { icons, display, prefix, dim, off_space, .. } => {
+                PickItem::Window { icons, display, prefix, dim, off_workspace, .. } => {
                     n += 1;
-                    SwitchRow { number: n, prefix, icons, label: display, dim, off_space, favorite: false, current: false }
+                    SwitchRow { number: n, prefix, icons, label: display, dim, off_workspace, favorite: false, current: false }
                 }
-                PickItem::Header { icons, display, prefix, dim, off_space } => SwitchRow { number: 0, prefix, icons, label: display, dim, off_space, favorite: false, current: false },
+                PickItem::Header { icons, display, prefix, dim, off_workspace } => SwitchRow { number: 0, prefix, icons, label: display, dim, off_workspace, favorite: false, current: false },
                 PickItem::Launch(i) => SwitchRow {
                     number: 0,
                     prefix: String::new(),
                     icons: vec![self.apps[i].clone()],
                     label: format!("⧉  {}", self.apps[i]),
                     dim: false,
-                    off_space: false,
+                    off_workspace: false,
                     favorite: self.is_favorite(&self.apps[i]),
                     current: false,
                 },
@@ -91,18 +91,7 @@ impl Daemon {
             }
             PickItem::Launch(i) => {
                 let app = self.apps[i].clone();
-                // `-n` opens a fresh instance so an already-running app still yields a new window for the pane. Singletons
-                // refuse `-n`, so fall back to plain activation. Finder won't open a window on activation, so point it at $HOME.
-                let cmd = if app == "Finder" {
-                    "open ~".to_string()
-                } else {
-                    let q = app.replace('\'', r"'\''");
-                    format!("open -na '{q}' || open -a '{q}'")
-                };
-
-                if let Err(e) = std::process::Command::new("sh").arg("-c").arg(&cmd).spawn() {
-                    eprintln!("failed to launch {app}: {e}");
-                }
+                self.backend.launch(&app);
                 self.pending_launch = Some(PendingLaunch { app, ticks: LAUNCH_ADOPT_TICKS });
                 // Clear the picker but keep focus on the empty pane; the "launching…" container renders there.
                 self.pane_picker = None;
@@ -126,7 +115,7 @@ impl Daemon {
             return false;
         }
         // "f" in navigate mode toggles the selected app's favorite.
-        if key.mods == Mods::default() && char_for_keycode(key.code) == Some('f') {
+        if key.mods == Mods::default() && key.code.char() == Some('f') {
             let app = {
                 let s = self.pane_picker.as_ref().unwrap();
                 match s.visible().into_iter().nth(s.selected()) {

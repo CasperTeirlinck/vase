@@ -7,8 +7,9 @@ use std::rc::Rc;
 
 use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
 use core_graphics::event::{CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, CallbackResult, EventField};
-use vase_core::input::keys::VK_ESC;
 use vase_core::input::{Decision, InputCommand, Key, KeyRouter, Mods};
+
+use crate::keycode::{key_code, VK_ESC};
 
 struct State {
     router: KeyRouter,
@@ -93,15 +94,15 @@ fn handle(state: &RefCell<State>, needs_reenable: &Rc<Cell<bool>>, event_type: C
         return if handled { CallbackResult::Drop } else { CallbackResult::Keep };
     }
 
-    let code = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
+    let vk = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
     let flags = event.get_flags();
-    let cmd = flags.contains(CGEventFlags::CGEventFlagCommand);
+    let meta = flags.contains(CGEventFlags::CGEventFlagCommand);
     let ctrl = flags.contains(CGEventFlags::CGEventFlagControl);
     let alt = flags.contains(CGEventFlags::CGEventFlagAlternate);
     let shift = flags.contains(CGEventFlags::CGEventFlagShift);
 
     // Safety layer 3: hardcoded kill chord Ctrl+Alt+Cmd+Esc → release keyboard.
-    if code as u16 == VK_ESC && cmd && ctrl && alt {
+    if vk == VK_ESC && meta && ctrl && alt {
         crate::request_quit();
         return CallbackResult::Drop;
     }
@@ -111,7 +112,9 @@ fn handle(state: &RefCell<State>, needs_reenable: &Rc<Cell<bool>>, event_type: C
         return CallbackResult::Keep;
     }
 
-    let key = Key { code: code as u16, mods: Mods { cmd, ctrl, alt, shift } };
+    // A key vase has no name for can match no binding, so it passes straight through.
+    let Some(code) = key_code(vk) else { return CallbackResult::Keep };
+    let key = Key { code, mods: Mods { meta, ctrl, alt, shift } };
 
     // Modal overlays (e.g. the switcher) get first dibs on the key, before the router. Borrow released here
     // so it doesn't overlap the `borrow_mut` below (the intercept closure reaches into a separate RefCell).

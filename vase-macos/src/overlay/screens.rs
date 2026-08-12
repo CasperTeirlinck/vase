@@ -4,6 +4,7 @@ use objc2::rc::Retained;
 use objc2::MainThreadMarker;
 use objc2_app_kit::NSScreen;
 use objc2_foundation::{NSNumber, NSRect, NSString};
+use vase_core::backend::Display;
 use vase_core::geometry::Rect;
 
 /// The primary display: `screens()[0]`, the menu-bar display and anchor of the AppKit/CG coordinate origin.
@@ -25,29 +26,15 @@ fn screen_number(screen: &NSScreen) -> Option<u32> {
     value.downcast::<NSNumber>().ok().map(|n| n.unsignedIntValue())
 }
 
-/// Each display's `(display id, full bounds, usable/visible area)` in CG top-left coords, in NSScreen order.
-/// The visible area excludes that display's menu bar and Dock, so it's the correct area to tile and place overlays.
-pub fn all_screens(mtm: MainThreadMarker) -> Vec<(u32, Rect, Rect)> {
+/// Every display in CG top-left coords, ordered left-to-right then top-to-bottom so a screen's index
+/// matches its physical layout. `work_area` excludes that display's menu bar and Dock.
+pub fn all_screens(mtm: MainThreadMarker) -> Vec<Display> {
     let Some(primary) = primary_screen(mtm) else {
         return Vec::new();
     };
     let ph = primary.frame().size.height;
     let to_cg = |f: NSRect| Rect::new(f.origin.x, ph - (f.origin.y + f.size.height), f.size.width, f.size.height);
-    NSScreen::screens(mtm).iter().map(|s| (screen_number(&s).unwrap_or(0), to_cg(s.frame()), to_cg(s.visibleFrame()))).collect()
-}
-
-/// Bounding box of the given CG rects, used to size an overlay panel to just its content (a window can't span displays under "separate Spaces").
-pub(crate) fn bbox(rects: &[Rect]) -> Rect {
-    let Some(first) = rects.first() else {
-        return Rect::new(0.0, 0.0, 0.0, 0.0);
-    };
-    let (mut x0, mut y0) = (first.x, first.y);
-    let (mut x1, mut y1) = (first.x + first.w, first.y + first.h);
-    for r in &rects[1..] {
-        x0 = x0.min(r.x);
-        y0 = y0.min(r.y);
-        x1 = x1.max(r.x + r.w);
-        y1 = y1.max(r.y + r.h);
-    }
-    Rect::new(x0, y0, x1 - x0, y1 - y0)
+    let mut displays: Vec<Display> = NSScreen::screens(mtm).iter().map(|s| Display { id: screen_number(&s).unwrap_or(0), bounds: to_cg(s.frame()), work_area: to_cg(s.visibleFrame()) }).collect();
+    displays.sort_by(|a, b| a.bounds.x.total_cmp(&b.bounds.x).then(a.bounds.y.total_cmp(&b.bounds.y)));
+    displays
 }

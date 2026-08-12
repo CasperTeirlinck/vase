@@ -1,8 +1,7 @@
 //! Running a bound command, and the sticky repeat modes that outlive the prefix.
 
 use vase_core::focus::Direction;
-use vase_core::input::keys::*;
-use vase_core::input::{InputCommand, Key};
+use vase_core::input::{InputCommand, Key, KeyCode};
 use vase_core::model::Command;
 
 use super::Daemon;
@@ -12,7 +11,7 @@ impl Daemon {
     pub fn intercept_key(&mut self, key: Key) -> bool {
         // A launch in flight makes its pane modal: only Esc, which cancels and collapses the pane.
         if self.pending_launch.is_some() {
-            if key.code == VK_ESC {
+            if key.code == KeyCode::Escape {
                 self.pending_launch = None;
                 self.dispatch(Command::CloseFocusedPane);
             }
@@ -74,14 +73,14 @@ impl Daemon {
 
     /// After a prefix resize or move-tab, the bare repeat keys keep acting until any other key. Returns whether the key was consumed.
     pub fn sticky_key(&mut self, key: Key) -> bool {
-        let shift_only = key.mods.shift && !key.mods.cmd && !key.mods.ctrl && !key.mods.alt;
+        let shift_only = key.mods.shift_only();
         if self.resize_sticky {
             // Arrows and vim keys both, matching the prefix bindings.
             let dir = match key.code {
-                VK_LEFT | VK_H => Some(Direction::Left),
-                VK_RIGHT | VK_L => Some(Direction::Right),
-                VK_UP_ARROW | VK_K => Some(Direction::Up),
-                VK_DOWN_ARROW | VK_J => Some(Direction::Down),
+                KeyCode::Left | KeyCode::Char('h') => Some(Direction::Left),
+                KeyCode::Right | KeyCode::Char('l') => Some(Direction::Right),
+                KeyCode::Up | KeyCode::Char('k') => Some(Direction::Up),
+                KeyCode::Down | KeyCode::Char('j') => Some(Direction::Down),
                 _ => None,
             };
             if let (true, Some(dir)) = (shift_only, dir) {
@@ -92,8 +91,8 @@ impl Daemon {
         }
         if self.movetab_sticky {
             let offset = match key.code {
-                VK_COMMA => Some(-1),
-                VK_PERIOD => Some(1),
+                KeyCode::Char(',') => Some(-1),
+                KeyCode::Char('.') => Some(1),
                 _ => None,
             };
             if let (true, Some(offset)) = (shift_only, offset) {

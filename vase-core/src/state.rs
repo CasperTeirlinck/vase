@@ -1,15 +1,14 @@
-//! Persist the layout as JSON in Application Support, and rebuild it against the live windows at startup.
-//! Each window's `(app, title)` is stored alongside so the layout can be re-matched after a reboot, when the OS has reassigned window ids.
+//! Persist the layout as JSON, and rebuild it against the live windows at startup. Each window's
+//! `(app, title)` is stored alongside so the layout can be re-matched after a reboot, when the OS
+//! has reassigned window ids. The platform crate supplies the path.
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::Path;
 
+use crate::geometry::Rect;
+use crate::model::Model;
+use crate::tree::WindowId;
 use serde::{Deserialize, Serialize};
-use vase_core::geometry::Rect;
-use vase_core::model::Model;
-use vase_core::tree::WindowId;
-
-use crate::daemon::all_windows;
 
 /// One managed window's stable identity at save time.
 pub type WindowIdentity = (WindowId, String, String); // (id, app, title)
@@ -29,22 +28,14 @@ struct Persisted {
     windows: Vec<WindowIdentity>,
 }
 
-/// `~/Library/Application Support/vase/state.json`.
-fn state_path() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join("Library/Application Support/vase/state.json"))
-}
-
-/// Load the saved model + window identities.
-pub fn load() -> Option<(Model, Vec<WindowIdentity>)> {
-    let data = std::fs::read_to_string(state_path()?).ok()?;
+pub fn load(path: &Path) -> Option<(Model, Vec<WindowIdentity>)> {
+    let data = std::fs::read_to_string(path).ok()?;
     let p: Persisted = serde_json::from_str(&data).ok()?;
     Some((p.model, p.windows))
 }
 
-/// Write the model + window identities to disk (best effort; errors ignored).
-pub fn save(model: &Model, windows: &[WindowIdentity]) {
-    let Some(path) = state_path() else { return };
+/// Best effort: write errors are ignored.
+pub fn save(path: &Path, model: &Model, windows: &[WindowIdentity]) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -61,7 +52,7 @@ pub fn restore(saved: Option<(Model, Vec<WindowIdentity>)>, live: &[LiveWindow],
         return Model::adopt(screens, &pairs);
     };
     model.reconfigure(screens);
-    let map = match_windows(&all_windows(&model), &identities, live);
+    let map = match_windows(&model.all_windows(), &identities, live);
     model.remap_windows(&map);
     // Live windows no saved tab claimed become new tabs.
     let claimed: HashSet<WindowId> = map.values().copied().collect();

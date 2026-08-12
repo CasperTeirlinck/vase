@@ -17,8 +17,30 @@ impl Rect {
     }
 }
 
-/// Height of a stack's local tab-bar strip. Mirrors the macOS tab-bar height.
-pub const STACK_BAR_H: f64 = 22.0;
+/// Height of a bar strip: the main tab bar, and each stack's local bar.
+pub const BAR_HEIGHT: f64 = 22.0;
+
+/// Index of the display whose bounds contain `frame`'s center (else 0).
+pub fn screen_of(frame: Rect, screens: &[Rect]) -> usize {
+    let cx = frame.x + frame.w / 2.0;
+    let cy = frame.y + frame.h / 2.0;
+    screens.iter().position(|r| cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h).unwrap_or(0)
+}
+
+pub fn bbox(rects: &[Rect]) -> Rect {
+    let Some(first) = rects.first() else {
+        return Rect::new(0.0, 0.0, 0.0, 0.0);
+    };
+    let (mut x0, mut y0) = (first.x, first.y);
+    let (mut x1, mut y1) = (first.x + first.w, first.y + first.h);
+    for r in &rects[1..] {
+        x0 = x0.min(r.x);
+        y0 = y0.min(r.y);
+        x1 = x1.max(r.x + r.w);
+        y1 = y1.max(r.y + r.h);
+    }
+    Rect::new(x0, y0, x1 - x0, y1 - y0)
+}
 
 /// Append `(pane_id, pane, rect)` for every leaf under `node` within `area`.
 pub fn layout(node: &Node, area: Rect, out: &mut Vec<(PaneId, Pane, Rect)>) {
@@ -26,7 +48,7 @@ pub fn layout(node: &Node, area: Rect, out: &mut Vec<(PaneId, Pane, Rect)>) {
         Node::Leaf { id, pane } => out.push((*id, *pane, area)),
         Node::Stack { id, items, selected } => {
             // Reserve the top strip for the bar; place only the selected item below.
-            let content = Rect::new(area.x, area.y + STACK_BAR_H, area.w, area.h - STACK_BAR_H);
+            let content = Rect::new(area.x, area.y + BAR_HEIGHT, area.w, area.h - BAR_HEIGHT);
             out.push((*id, items[*selected], content));
         }
         Node::Split { dir, ratios, children } => {

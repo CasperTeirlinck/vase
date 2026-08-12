@@ -23,9 +23,9 @@ pub struct SwitchItem {
     pub prefix: String,     // tree glyph for a nested row
     pub icons: Vec<String>, // app icons (several on a split/stack parent)
     pub display: String,
-    pub dim: bool,       // on a non-focused monitor
-    pub off_space: bool, // a window in the row is on another Space
-    pub current: bool,   // the currently-focused window
+    pub dim: bool,           // on a non-focused monitor
+    pub off_workspace: bool, // a window in the row is on another Space
+    pub current: bool,       // the currently-focused window
 }
 
 /// Every switcher row is pickable, including tab headers.
@@ -90,8 +90,8 @@ impl Daemon {
                             search.push(' ');
                             search.push_str(&self.switcher_label(*w));
                         }
-                        let off_space = wins.iter().any(|w| self.off_space.contains(w));
-                        items.push((SwitchItem { target: SwitchTarget::Tab(si, ti), prefix: String::new(), icons, display, dim, off_space, current: false }, search));
+                        let off_workspace = wins.iter().any(|w| self.off_workspace.contains(w));
+                        items.push((SwitchItem { target: SwitchTarget::Tab(si, ti), prefix: String::new(), icons, display, dim, off_workspace, current: false }, search));
                         self.push_children(&tab.root, dim, focused, &mut items);
                     }
                 }
@@ -132,8 +132,8 @@ impl Daemon {
                         search.push(' ');
                         search.push_str(&self.switcher_label(*w));
                     }
-                    let off_space = wins.iter().any(|w| self.off_space.contains(w));
-                    items.push((SwitchItem { target: SwitchTarget::Window(*selected), prefix: g1.to_string(), icons, display, dim, off_space, current: false }, search));
+                    let off_workspace = wins.iter().any(|w| self.off_workspace.contains(w));
+                    items.push((SwitchItem { target: SwitchTarget::Window(*selected), prefix: g1.to_string(), icons, display, dim, off_workspace, current: false }, search));
                     let m = wins.len();
                     for (j, w) in wins.iter().enumerate() {
                         let g2 = if j + 1 == m { "   └─ " } else { "   ├─ " };
@@ -153,7 +153,7 @@ impl Daemon {
             icons: vec![self.windows.app(id).to_string()],
             display: self.window_display(id, in_stack),
             dim,
-            off_space: self.off_space.contains(&id),
+            off_workspace: self.off_workspace.contains(&id),
             current: Some(id) == focused,
         }
     }

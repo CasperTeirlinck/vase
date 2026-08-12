@@ -69,6 +69,7 @@ included, separated by commas.
 
 - _core_: the platform-agnostic layout and model crate (`vase-core`)
 - _macos_: the macOS backend crate (`vase-macos`)
+- _windows_: the Windows backend crate (`vase-windows`)
 - _docs_: README, ADRs, and other documentation
 - _packaging_: the app bundle, Homebrew formula/cask, and install script
 

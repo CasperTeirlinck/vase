@@ -1,7 +1,7 @@
 use super::super::{Node, Pane, PaneId, WindowId};
 use super::{collapse, rebuild_children, remove_leaf};
 
-/// Turn the `Leaf{Window}` `target` into a `Stack`, or push an `Empty` onto the `Stack` `target` and select it. `None` for an empty leaf or missing target.
+/// Turn the `Leaf{Window}` `target` into a `Stack`, or push an `Empty` onto the `Stack` `target` and select it. `None` for an empty leaf.
 pub fn stackify(node: Node, target: PaneId) -> Option<Node> {
     match node {
         Node::Leaf { id, pane: Pane::Window(w) } if id == target => Some(Node::Stack { id, items: vec![Pane::Window(w), Pane::Empty], selected: 1 }),

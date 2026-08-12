@@ -1,4 +1,6 @@
-use crate::overlay::text::*;
+use crate::chrome::*;
+
+mod bar;
 
 #[test]
 fn scroll_offset_keeps_selection_in_view() {

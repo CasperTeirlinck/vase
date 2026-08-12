@@ -8,26 +8,24 @@ mod pane_picker;
 mod prompt;
 mod reconcile;
 mod switcher;
-mod util;
 
 use std::collections::HashSet;
 
 use objc2::MainThreadMarker;
+use vase_core::backend::Backend;
+use vase_core::config::AppFocus;
 use vase_core::geometry::Rect;
 use vase_core::input::{NumberEntry, Switcher};
 use vase_core::model::{apply, Command, Model};
+use vase_core::registry::Registry;
 use vase_core::tree::WindowId;
 
 use crate::overlay::{Chrome, Overlays};
-use crate::registry::Registry;
 use crate::MacBackend;
 
 use pane_picker::{PendingLaunch, PickItem};
 use prompt::PromptKind;
 use switcher::SwitchItem;
-use util::discover_apps;
-
-pub use util::{all_windows, app_matches, clean_title, screen_of};
 
 /// How long to wait for a cross-display-moved window to settle before re-asserting its frame.
 const REFRAME_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
@@ -50,8 +48,8 @@ pub struct Daemon {
     overlays: Overlays,
     /// Whether a window is fullscreen, so the overlays hide instead of sitting over it.
     fullscreen: bool,
-    /// Managed windows currently on another Space.
-    off_space: HashSet<WindowId>,
+    /// Managed windows currently on another workspace.
+    off_workspace: HashSet<WindowId>,
     /// Polls to skip OS-focus-following after our own focus command, so CGWindowList's lag on a just-raised window doesn't flip focus back (a flicker).
     focus_cooldown: u32,
     /// Last observed OS-frontmost window, so focus-follow is edge-triggered (fires only on a real change).
@@ -84,10 +82,8 @@ pub struct Daemon {
     display_ids: Vec<u32>,
     /// Whether the prefix chord is armed; drives the prefix dot on the tab bar.
     pub prefix_armed: bool,
-    /// Main-thread marker, for querying displays from the reconcile loop.
-    mtm: MainThreadMarker,
     /// Configurable global hotkeys that toggle focus to a specific app.
-    app_hotkeys: Vec<crate::config::AppFocus>,
+    app_hotkeys: Vec<AppFocus>,
     /// In-progress `prefix-<number>` tab selection.
     pub tab_entry: NumberEntry,
 }
@@ -96,8 +92,10 @@ impl Daemon {
     /// Construct the daemon from the startup-computed window/display state.
     #[allow(clippy::too_many_arguments)]
     pub fn new(mtm: MainThreadMarker, model: Model, backend: MacBackend, windows: Registry, main_screen: usize, screens_cg: Vec<Rect>, display_ids: Vec<u32>) -> Self {
-        crate::overlay::set_theme(crate::config::load_theme());
-        crate::overlay::set_mark(crate::config::load_mark());
+        let config = crate::paths::load_config();
+        vase_core::chrome::theme::set_theme(config.theme);
+        vase_core::chrome::theme::set_mark(config.mark);
+        let apps = backend.launchable_apps();
         Daemon {
             model: Some(model),
             backend,
@@ -110,14 +108,14 @@ impl Daemon {
             reframe_deadline: None,
             overlays: Overlays::new(mtm),
             fullscreen: false,
-            off_space: HashSet::new(),
+            off_workspace: HashSet::new(),
             focus_cooldown: 0,
             last_front: None,
             last_focused: None,
             switcher: None,
             pane_picker: None,
-            apps: discover_apps(),
-            favorites: crate::config::favorites(),
+            apps,
+            favorites: config.favorites,
             icon_warm: 0,
             pending_launch: None,
             prompt: None,
@@ -126,9 +124,8 @@ impl Daemon {
             main_screen,
             screens_cg,
             prefix_armed: false,
-            mtm,
             display_ids,
-            app_hotkeys: crate::config::load(),
+            app_hotkeys: config.app_focus,
             tab_entry: NumberEntry::default(),
         }
     }
@@ -167,7 +164,7 @@ impl Daemon {
         let chrome = Chrome {
             windows: &self.windows,
             badges: &self.badges,
-            off_space: &self.off_space,
+            off_workspace: &self.off_workspace,
             hotkeys: &self.app_hotkeys,
             main_screen: self.main_screen,
             prefix_armed: self.prefix_armed,
@@ -180,8 +177,9 @@ impl Daemon {
     /// Persist the layout so a restart restores it; stores each window's `(app, title)` to re-match after a reboot reassigns ids.
     pub(crate) fn save_state(&self) {
         if let Some(m) = &self.model {
-            let windows: Vec<crate::state::WindowIdentity> = all_windows(m).into_iter().map(|id| (id, self.windows.app(id).to_string(), self.windows.title(id).to_string())).collect();
-            crate::state::save(m, &windows);
+            let Some(path) = crate::paths::state() else { return };
+            let windows: Vec<vase_core::state::WindowIdentity> = m.all_windows().into_iter().map(|id| (id, self.windows.app(id).to_string(), self.windows.title(id).to_string())).collect();
+            vase_core::state::save(&path, m, &windows);
         }
     }
 

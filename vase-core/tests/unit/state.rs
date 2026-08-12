@@ -1,7 +1,7 @@
+use crate::geometry::Rect;
+use crate::model::Model;
 use crate::state::*;
-use vase_core::geometry::Rect;
-use vase_core::model::Model;
-use vase_core::tree::{windows, WindowId};
+use crate::tree::{windows, WindowId};
 
 fn rect() -> Rect {
     Rect::new(0.0, 0.0, 1000.0, 800.0)

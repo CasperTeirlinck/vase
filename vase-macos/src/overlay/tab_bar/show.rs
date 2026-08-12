@@ -9,9 +9,10 @@ use vase_core::geometry::Rect;
 
 use super::super::text::{app_icon, segment};
 use super::super::theme::*;
-use super::super::{BAR_HEIGHT, FONT_SIZE, SPACE_MARK};
+use super::super::{BAR_HEIGHT, FONT_SIZE, WORKSPACE_MARK};
 use super::paths::{tab_path, tab_path_cap_left};
-use super::{BarTab, TabBar};
+use super::TabBar;
+use vase_core::chrome::bar::BarTab;
 
 const TAB_ICON: f64 = 14.0; // app-icon size in a tab
 const TAB_ICON_GAP: f64 = 4.0; // gap between the icon and the app name
@@ -42,7 +43,7 @@ impl TabBar {
 
         let mut cursor = lead_w;
         // Icons are separate NSImageViews, not label attachments: an attachment inside the label intermittently swallowed the text.
-        for (i, BarTab { icons: icon_apps, badges, label: label_text, zoomed, number, dim, off_space, hotkey }) in tabs.iter().enumerate() {
+        for (i, BarTab { icons: icon_apps, badges, label: label_text, zoomed, number, dim, off_workspace, hotkey }) in tabs.iter().enumerate() {
             // Pair each resolved icon with its badge flag; unresolved icons drop from both, staying aligned.
             let icons: Vec<(Retained<NSImage>, bool)> =
                 icon_apps.iter().zip(badges.iter().copied().chain(std::iter::repeat(false))).filter_map(|(a, badged)| app_icon(a).map(|img| (img, badged))).collect();
@@ -65,8 +66,8 @@ impl TabBar {
             let n = icons.len() as f64;
             // Grey position number in front of the icon (the `prefix-N` shortcut), with a leading Space marker
             let num_seg = NSMutableAttributedString::new();
-            if *off_space {
-                num_seg.appendAttributedString(&segment(SPACE_MARK, &font, &accent(), None));
+            if *off_workspace {
+                num_seg.appendAttributedString(&segment(WORKSPACE_MARK, &font, &accent(), None));
                 num_seg.appendAttributedString(&segment(" ", &font, &dim_col(), None));
             }
             num_seg.appendAttributedString(&segment(&format!("{number} "), &font, &dim_col(), None));

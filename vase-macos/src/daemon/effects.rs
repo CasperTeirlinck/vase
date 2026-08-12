@@ -3,11 +3,11 @@
 use std::collections::HashSet;
 
 use vase_core::backend::Backend;
-use vase_core::geometry::Rect;
+use vase_core::geometry::{screen_of, Rect};
 use vase_core::model::Effect;
 use vase_core::tree::WindowId;
 
-use super::{screen_of, Daemon, REFRAME_SETTLE};
+use super::{Daemon, REFRAME_SETTLE};
 
 impl Daemon {
     pub fn execute(&mut self, effects: Vec<Effect>) {

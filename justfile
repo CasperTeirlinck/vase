@@ -1,6 +1,8 @@
 set shell := ["bash", "-uc"]
 
 bin := "target/release/vase"
+host_crates := if os() == "macos" { "-p vase-core -p vase-macos" } else if os() == "windows" { "-p vase-core -p vase-windows" } else { "-p vase-core" }
+windows_target := "x86_64-pc-windows-gnu"
 app := "dist/vase.app"
 version := `cd vase-macos && cargo read-manifest | jq -r .version`
 
@@ -11,11 +13,15 @@ build:
     cargo build --release --bin vase
 
 test:
-    cargo test --workspace
+    cargo test {{ host_crates }}
 
 check:
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy {{ host_crates }} --all-targets -- -D warnings
     cargo fmt --check
+
+# Type-check vase-windows from macOS or Linux. Needs mingw-w64 and `rustup target add x86_64-pc-windows-gnu`.
+check-windows:
+    cargo clippy -p vase-windows --target {{ windows_target }} --all-targets -- -D warnings
 
 # Assemble dist/vase.app around an already-built binary at `binpath`.
 _bundle binpath ver:

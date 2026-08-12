@@ -1,7 +1,7 @@
+use crate::backend::WindowInfo;
+use crate::geometry::Rect;
 use crate::registry::*;
-use vase_core::backend::WindowInfo;
-use vase_core::geometry::Rect;
-use vase_core::tree::WindowId;
+use crate::tree::WindowId;
 
 fn info(id: u64, app: &str, title: &str) -> WindowInfo {
     WindowInfo { id: WindowId(id), pid: 1, app: app.into(), title: title.into(), frame: Rect::new(10.0, 20.0, 300.0, 400.0), layer: 0 }
@@ -69,4 +69,26 @@ fn minimized_state_survives_a_round_trip() {
     assert!(r.is_minimized(WindowId(1)));
     r.set_minimized(WindowId(1), false);
     assert!(!r.is_minimized(WindowId(1)));
+}
+
+#[test]
+fn clean_title_strips_the_redundant_app_name() {
+    // App-name prefix (Activity Monitor) → keep the meaningful remainder.
+    assert_eq!(clean_title("Activity Monitor – All Processes", "Activity Monitor"), "All Processes");
+    // App name mid/suffix (Chrome/Brave) → keep the part before it.
+    assert_eq!(clean_title("Incidents - PagerDuty - Google Chrome – Person 1", "Google Chrome"), "Incidents - PagerDuty");
+    // App's first word matches when the full name doesn't (Brave Browser → Brave).
+    assert_eq!(clean_title("Workflow runs · checkup - Brave", "Brave Browser"), "Workflow runs · checkup");
+    // Title that is only the app name → nothing left.
+    assert_eq!(clean_title("Ghostty", "Ghostty"), "");
+    // Unrelated title is left as-is.
+    assert_eq!(clean_title("notes.md — draft", "Obsidian"), "notes.md — draft");
+}
+
+#[test]
+fn app_matches_either_direction_and_ignores_case() {
+    assert!(app_matches("Google Chrome", "google chrome"));
+    assert!(app_matches("Brave Browser", "Brave"), "configured short name matches the full one");
+    assert!(app_matches("Code", "Visual Studio Code"), "and the other way round");
+    assert!(!app_matches("Ghostty", "Obsidian"));
 }

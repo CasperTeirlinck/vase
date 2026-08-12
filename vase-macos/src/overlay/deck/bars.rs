@@ -2,10 +2,10 @@
 
 use vase_core::geometry::Rect;
 use vase_core::model::{Command, Model};
+use vase_core::registry::{app_matches, clean_title};
 use vase_core::tree::WindowId;
 
 use super::{Chrome, Overlays};
-use crate::daemon::{app_matches, clean_title};
 use crate::overlay::{BarTab, TabBar, BAR_HEIGHT};
 
 /// A drawn bar's click map: its CG rect, per-tab hit ranges, and what each range selects.
@@ -64,8 +64,8 @@ impl Overlays {
                 };
                 // Dim tabs not on the focused monitor; the number is the tab's `prefix-N` shortcut.
                 let dim = flat_tab(model, i).is_some_and(|(si, _)| si != model.focused_screen);
-                let off_space = windows.iter().any(|id| chrome.off_space.contains(id));
-                BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, off_space, hotkey }
+                let off_workspace = windows.iter().any(|id| chrome.off_workspace.contains(id));
+                BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, off_workspace, hotkey }
             })
             .collect();
         let ranges = self.bar.show(bar_rect, &bar_tabs, selected, chrome.prefix_armed, true);
@@ -98,8 +98,8 @@ impl Overlays {
                         }
                     };
                     let badged = chrome.badges.contains(&app);
-                    let off_space = chrome.off_space.contains(id);
-                    BarTab { icons: vec![app], badges: vec![badged], label, zoomed: false, number: i + 1, dim: false, off_space, hotkey: false }
+                    let off_workspace = chrome.off_workspace.contains(id);
+                    BarTab { icons: vec![app], badges: vec![badged], label, zoomed: false, number: i + 1, dim: false, off_workspace, hotkey: false }
                 })
                 .collect();
             let bar_rect = Rect::new(stack.rect.x, stack.rect.y, stack.rect.w, BAR_HEIGHT);

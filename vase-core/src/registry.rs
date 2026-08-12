@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use vase_core::backend::WindowInfo;
-use vase_core::geometry::Rect;
-use vase_core::tree::WindowId;
+use crate::backend::WindowInfo;
+use crate::geometry::Rect;
+use crate::tree::WindowId;
 
 /// One adopted window.
 #[derive(Debug, Clone, PartialEq)]
@@ -92,4 +92,35 @@ impl Registry {
     pub fn iter(&self) -> impl Iterator<Item = (WindowId, &Window)> {
         self.windows.iter().map(|(id, w)| (*id, w))
     }
+}
+
+/// Case-insensitive, either-direction match of an app name against a configured app.
+pub fn app_matches(name: &str, app: &str) -> bool {
+    let (a, b) = (name.to_lowercase(), app.to_lowercase());
+    a == b || a.contains(&b) || b.contains(&a)
+}
+
+/// Strip a redundant occurrence of the app name from a window title.
+pub fn clean_title(title: &str, app: &str) -> String {
+    let title = title.trim();
+    let tl = title.to_lowercase();
+    let sep = |c: char| c.is_whitespace() || "-–—|·:".contains(c);
+    for needle in [app.trim(), app.split_whitespace().next().unwrap_or("")] {
+        if needle.is_empty() {
+            continue;
+        }
+        if let Some(pos) = tl.find(&needle.to_lowercase()) {
+            let end = pos + needle.len();
+            // tl/title byte layout diverges only on length-changing lowercasing; bail if not on a boundary.
+            if !title.is_char_boundary(pos) || !title.is_char_boundary(end) {
+                continue;
+            }
+            let before = title[..pos].trim_matches(sep);
+            if !before.is_empty() {
+                return before.to_string();
+            }
+            return title[end..].trim_matches(sep).to_string();
+        }
+    }
+    title.to_string()
 }

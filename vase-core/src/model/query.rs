@@ -18,6 +18,11 @@ impl Model {
         self.screens.iter().position(|s| s.current_tab().map(|t| leaf_pane(&t.root, pid).is_some()).unwrap_or(false))
     }
 
+    /// Every managed window, across every screen's tabs (not just the visible ones).
+    pub fn all_windows(&self) -> Vec<WindowId> {
+        self.screens.iter().flat_map(|s| s.tabs.iter()).flat_map(|t| windows(&t.root)).collect()
+    }
+
     /// Visible window placements across all screens.
     pub fn placements(&self) -> Vec<(WindowId, Rect)> {
         let mut out = Vec::new();

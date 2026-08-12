@@ -11,9 +11,9 @@ use objc2::MainThreadMarker;
 use vase_core::geometry::Rect;
 
 use super::{FocusBorder, PaneOverlay, SwitchRow, SwitcherView, TabBar};
-use crate::config::AppFocus;
-use crate::registry::Registry;
 use bars::ClickMap;
+use vase_core::config::AppFocus;
+use vase_core::registry::Registry;
 
 mod bars;
 
@@ -22,8 +22,8 @@ pub struct Chrome<'a> {
     pub windows: &'a Registry,
     /// Apps showing a Dock notification badge; drives the red dot on their tabs.
     pub badges: &'a HashSet<String>,
-    /// Managed windows on another Space; drives the Space marker on their tabs and rows.
-    pub off_space: &'a HashSet<vase_core::tree::WindowId>,
+    /// Managed windows on another workspace; drives the marker on their tabs and rows.
+    pub off_workspace: &'a HashSet<vase_core::tree::WindowId>,
     /// Apps with a focus-toggle hotkey; their tabs get a marker.
     pub hotkeys: &'a [AppFocus],
     /// Display the tab bar lives on.

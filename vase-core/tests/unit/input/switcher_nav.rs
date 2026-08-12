@@ -22,16 +22,16 @@ fn moving_up_from_the_top_wraps_to_the_bottom() {
 #[test]
 fn arrows_move_like_j_and_k() {
     let mut s = sw();
-    press(&mut s, VK_DOWN_ARROW);
+    press(&mut s, KeyCode::Down);
     assert_eq!(s.selected(), 1);
-    press(&mut s, VK_UP_ARROW);
+    press(&mut s, KeyCode::Up);
     assert_eq!(s.selected(), 0);
 }
 
 #[test]
 fn gg_jumps_to_the_top_and_shift_g_to_the_bottom() {
     let mut s = sw();
-    assert_eq!(s.key(Key { code: VK_G, mods: Mods { shift: true, ..Mods::default() } }, t0()), Pick::Redraw);
+    assert_eq!(s.key(Key { code: KeyCode::Char('g'), mods: Mods { shift: true, ..Mods::default() } }, t0()), Pick::Redraw);
     assert_eq!(s.selected(), 2);
     ch(&mut s, 'g'); // first g: waits
     assert_eq!(s.selected(), 2, "a lone g must not move");
@@ -67,7 +67,7 @@ fn backspace_widens_the_search_again() {
     ch(&mut s, '/');
     ch(&mut s, 'g');
     assert_eq!(ids(&s).len(), 2);
-    press(&mut s, VK_DELETE);
+    press(&mut s, KeyCode::Backspace);
     assert_eq!(ids(&s).len(), 3);
 }
 
@@ -76,11 +76,11 @@ fn esc_leaves_search_first_then_cancels() {
     let mut s = sw();
     ch(&mut s, '/');
     ch(&mut s, 'g');
-    assert_eq!(press(&mut s, VK_ESC), Pick::Redraw);
+    assert_eq!(press(&mut s, KeyCode::Escape), Pick::Redraw);
     assert!(!s.is_searching());
     assert_eq!(s.query(), "");
     assert_eq!(ids(&s).len(), 3);
-    assert_eq!(press(&mut s, VK_ESC), Pick::Cancelled);
+    assert_eq!(press(&mut s, KeyCode::Escape), Pick::Cancelled);
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn j_navigates_in_search_mode_instead_of_typing() {
 fn enter_chooses_the_highlighted_row() {
     let mut s = sw();
     ch(&mut s, 'j');
-    assert_eq!(press(&mut s, VK_RETURN), Pick::Chosen(Row::Win(2)));
+    assert_eq!(press(&mut s, KeyCode::Return), Pick::Chosen(Row::Win(2)));
 }
 
 #[test]

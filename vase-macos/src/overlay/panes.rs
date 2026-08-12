@@ -4,10 +4,9 @@ use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSBox, NSBoxType, NSColor, NSTitlePosition};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
-use vase_core::geometry::Rect;
+use vase_core::geometry::{bbox, Rect};
 
 use super::panel::Panel;
-use super::screens::bbox;
 use super::theme::*;
 
 /// Placeholder overlay for a tab's empty panes: one rounded container per rect.
