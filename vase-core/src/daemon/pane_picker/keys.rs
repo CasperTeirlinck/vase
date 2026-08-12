@@ -2,19 +2,20 @@
 
 use std::time::Instant;
 
-use vase_core::backend::Backend;
-use vase_core::backend::WindowInfo;
-use vase_core::input::{Key, Mods, Pick, Switcher};
-use vase_core::model::Command;
+use crate::backend::Backend;
+use crate::backend::WindowInfo;
+use crate::input::{Key, Mods, Pick, Switcher};
+use crate::model::Command;
 
 use super::{PendingLaunch, PickItem};
+use crate::chrome::Painter;
+use crate::chrome::{ListAt, SwitchRow};
 use crate::daemon::Daemon;
-use crate::overlay::SwitchRow;
 
 /// Reconcile ticks a pending launch waits for its window before it's dropped.
 const LAUNCH_ADOPT_TICKS: u32 = 100; // ~10 s at the ~100 ms reconcile poll
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Auto-open the picker over a focused empty pane, close it when the pane fills.
     pub(crate) fn refresh_pane_picker(&mut self) {
         // While a launch is in flight, show a "launching…" container instead of the picker.
@@ -23,7 +24,7 @@ impl Daemon {
             let area = self.model.as_ref().unwrap().empty_panes().into_iter().find(|(_, focused)| *focused).map(|(rect, _)| rect);
             match area {
                 Some(area) => {
-                    self.overlays.show_list_in(area, &header, &[], 0);
+                    self.chrome.list(ListAt::Filling(area), &header, &[], 0);
                     return;
                 }
                 // Target pane gone (filled or focus moved): drop the launch, fall through to hide.
@@ -40,7 +41,7 @@ impl Daemon {
             self.render_pane_picker();
         } else if self.switcher.is_none() {
             // Neither picker nor switcher wants the shared panel; hide any leftover view.
-            self.overlays.hide_list();
+            self.chrome.hide_list();
         }
     }
 
@@ -73,13 +74,13 @@ impl Daemon {
         let selected = s.selected();
         let area = self.model.as_ref().unwrap().empty_panes().into_iter().find(|(_, focused)| *focused).map(|(rect, _)| rect);
         if let Some(area) = area {
-            self.overlays.show_list_in(area, &header, &rows, selected);
+            self.chrome.list(ListAt::Filling(area), &header, &rows, selected);
         }
     }
 
     fn close_pane_picker(&mut self) {
         self.pane_picker = None;
-        self.overlays.hide_list();
+        self.chrome.hide_list();
     }
 
     /// Move the selected window into the pane, or launch the selected app.

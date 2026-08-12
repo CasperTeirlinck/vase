@@ -1,5 +1,8 @@
 use super::*;
-use vase_core::tree::WindowId;
+use crate::chrome::deck::{route_click, ClickMap};
+use crate::geometry::Rect;
+use crate::model::{Command, Model};
+use crate::tree::WindowId;
 
 /// A bar 200 wide at y=780, one 50-wide range per tab.
 fn bar() -> (Rect, Vec<(f64, f64)>) {

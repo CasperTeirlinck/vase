@@ -2,14 +2,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use vase_core::backend::{manageable, Backend, WindowInfo};
-use vase_core::geometry::{screen_of, Rect};
-use vase_core::model::{Command, Effect, Screen, Tab};
-use vase_core::tree::WindowId;
+use crate::backend::{manageable, Backend, WindowInfo};
+use crate::geometry::{screen_of, Rect};
+use crate::model::{Command, Effect, Screen, Tab};
+use crate::tree::WindowId;
 
 use super::Daemon;
+use crate::chrome::Painter;
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Pull each managed window's current title via Accessibility; returns whether any changed.
     fn refresh_titles(&mut self) -> bool {
         let ids = self.model.as_ref().unwrap().all_windows();
@@ -26,7 +27,7 @@ impl Daemon {
     fn adopt(&mut self, w: &WindowInfo) {
         self.windows.adopt(w, false);
         // Warm this window's app icon so its tab shows it right away.
-        crate::overlay::prewarm_icon(&w.app);
+        self.chrome.prewarm_icon(&w.app);
         // A pending launch's window fills the focused empty pane instead of opening a new tab.
         if self.launch_matches(w) {
             self.pending_launch = None;
@@ -63,7 +64,7 @@ impl Daemon {
         let mut old_by_id: HashMap<u32, Screen> = self.display_ids.iter().copied().zip(std::mem::take(&mut model.screens)).collect();
         let mut new_screens: Vec<Screen> = Vec::with_capacity(displays.len());
         for (i, display) in displays.iter().enumerate() {
-            let rect = crate::overlay::usable(display.work_area, i == main_screen);
+            let rect = crate::chrome::usable(display.work_area, i == main_screen);
             let screen = match old_by_id.remove(&display.id) {
                 Some(mut s) => {
                     s.rect = rect;
@@ -196,7 +197,7 @@ impl Daemon {
     /// Poll the Dock for notification badges (throttled) and redraw bars on a change.
     fn refresh_badges(&mut self) {
         self.badge_tick = self.badge_tick.wrapping_add(1);
-        if self.badge_tick % 5 != 0 {
+        if !self.badge_tick.is_multiple_of(5) {
             return; // ~every 5th reconcile (~500 ms)
         }
         let badges = self.backend.badged_apps();

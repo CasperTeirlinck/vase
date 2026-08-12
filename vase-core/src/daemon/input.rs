@@ -1,12 +1,14 @@
 //! Running a bound command, and the sticky repeat modes that outlive the prefix.
 
-use vase_core::focus::Direction;
-use vase_core::input::{InputCommand, Key, KeyCode};
-use vase_core::model::Command;
+use crate::focus::Direction;
+use crate::input::{InputCommand, Key, KeyCode};
+use crate::model::Command;
 
 use super::Daemon;
+use crate::backend::Backend;
+use crate::chrome::Painter;
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Offer a key to whatever is modal, before the prefix router sees it. Returns whether the key was swallowed. The order here *is* the modal precedence.
     pub fn intercept_key(&mut self, key: Key) -> bool {
         // A launch in flight makes its pane modal: only Esc, which cancels and collapses the pane.
@@ -58,7 +60,7 @@ impl Daemon {
             }
             I::Quit => {
                 self.restore();
-                crate::request_quit();
+                self.quit = true;
             }
             I::WindowSwitcher => self.open_switcher(),
             I::Rename => self.start_rename(),

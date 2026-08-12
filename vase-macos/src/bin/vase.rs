@@ -5,16 +5,19 @@ use std::rc::Rc;
 use objc2_app_kit::{NSApplication, NSEventMask};
 use objc2_foundation::{NSDate, NSDefaultRunLoopMode};
 use vase_core::backend::{manageable, Backend};
+use vase_core::daemon::{Daemon, Paths};
 use vase_core::geometry::{screen_of, Rect};
 use vase_core::input::{InputCommand, Key};
 use vase_core::model::{Command, Effect};
 use vase_core::registry::Registry;
 use vase_core::state::LiveWindow;
 use vase_core::tree::WindowId;
-use vase_macos::daemon::Daemon;
-use vase_macos::{nsapp_init, EventTap, MacBackend};
+use vase_macos::{nsapp_init, AppKitPainter, EventTap, MacBackend};
 
-struct RestoreGuard(Rc<RefCell<Daemon>>);
+/// The daemon, bound to this platform's backend and painter.
+type Vase = Daemon<MacBackend, AppKitPainter>;
+
+struct RestoreGuard(Rc<RefCell<Vase>>);
 impl Drop for RestoreGuard {
     fn drop(&mut self) {
         self.0.borrow_mut().restore();
@@ -39,7 +42,7 @@ fn main() {
     let screens_cg: Vec<Rect> = displays.iter().map(|d| d.bounds).collect();
     // The main display is the one at the CG global origin (0,0).
     let main_screen = screens_cg.iter().position(|r| r.x == 0.0 && r.y == 0.0).unwrap_or(0);
-    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_macos::overlay::usable(d.work_area, i == main_screen)).collect();
+    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen)).collect();
 
     // Adopt every on-screen manageable window, plus the ones already minimized: scan the full window list (all Spaces) and keep only the ones AX confirms are minimized,
     // so we don't pull in other Spaces' or background windows. Minimized ones show as tabs but aren't placed until selected.
@@ -60,13 +63,15 @@ fn main() {
     }
     println!("adopted {} windows as tabs.", live.len());
 
-    let saved = vase_macos::paths::state().and_then(|p| vase_core::state::load(&p));
+    let paths = Paths { config: vase_macos::paths::config(), state: vase_macos::paths::state() };
+    let saved = paths.state.as_deref().and_then(vase_core::state::load);
     if saved.is_some() {
         println!("restored saved layout.");
     }
     let model = vase_core::state::restore(saved, &live, &screen_rects);
 
-    let daemon = Rc::new(RefCell::new(Daemon::new(mtm, model, backend, windows, main_screen, screens_cg, display_ids)));
+    let painter = AppKitPainter::new(mtm);
+    let daemon = Rc::new(RefCell::new(Vase::new(model, backend, painter, windows, paths, main_screen, screens_cg, display_ids)));
     // Armed now, before the tap exists: nothing has been moved yet (adoption above only reads frames), so a panic before install has nothing to undo; the guard just becomes a no-op restore.
     let _guard = RestoreGuard(Rc::clone(&daemon));
 
@@ -116,11 +121,11 @@ fn main() {
 }
 
 /// AppKit's event loop, ticking the daemon each wake, until the user quits, the kill chord, or a crash; nothing is parked off-screen, so an abrupt exit leaves windows visible.
-fn run_event_loop(mtm: objc2::MainThreadMarker, daemon: &Rc<RefCell<Daemon>>, tap: &EventTap) {
+fn run_event_loop(mtm: objc2::MainThreadMarker, daemon: &Rc<RefCell<Vase>>, tap: &EventTap) {
     let app = NSApplication::sharedApplication(mtm);
     let mode = unsafe { NSDefaultRunLoopMode };
     let mut wake = 0u32;
-    while !vase_macos::should_quit() {
+    while !vase_macos::should_quit() && !daemon.borrow().quit_requested() {
         // Block up to ~25 ms for the next event (keeps the prefix-number timeout crisp), dispatch it, then drain any others.
         // Servicing events here also drives the CFRunLoop (the tap is on common modes) and lets the status-item menu act.
         let deadline = NSDate::dateWithTimeIntervalSinceNow(0.025);

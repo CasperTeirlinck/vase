@@ -4,7 +4,7 @@ use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBox, NSBoxType, NSColor, NSFont, NSTextAlignment, NSTextField, NSTitlePosition};
 use objc2_foundation::{NSMutableAttributedString, NSPoint, NSRect, NSSize, NSString};
-use vase_core::chrome::scroll_offset;
+use vase_core::chrome::{scroll_offset, SwitchRow};
 use vase_core::geometry::Rect;
 
 use super::panel::Panel;
@@ -15,18 +15,6 @@ use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
 const SWITCHER_ROW_H: f64 = 28.0;
 const SWITCHER_WIDTH: f64 = 640.0;
 const SWITCHER_MAX_ITEMS: usize = 12;
-
-/// One switcher row.
-pub struct SwitchRow {
-    pub number: usize,
-    pub prefix: String,
-    pub icons: Vec<String>,
-    pub label: String,
-    pub dim: bool,           // on a non-focused monitor
-    pub off_workspace: bool, // the window is on another Space
-    pub favorite: bool,      // a favorite app (picker launch row)
-    pub current: bool,       // the currently-focused window
-}
 
 /// Where a list is framed and how its card is trimmed. The two framings differ only in these values; everything below the card is drawn the same way.
 struct Frame {

@@ -2,14 +2,15 @@
 
 use std::collections::HashSet;
 
-use vase_core::backend::Backend;
-use vase_core::geometry::{screen_of, Rect};
-use vase_core::model::Effect;
-use vase_core::tree::WindowId;
+use crate::backend::Backend;
+use crate::geometry::{screen_of, Rect};
+use crate::model::Effect;
+use crate::tree::WindowId;
 
 use super::{Daemon, REFRAME_SETTLE};
+use crate::chrome::Painter;
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     pub fn execute(&mut self, effects: Vec<Effect>) {
         // A batch with a Render is a bring-forward (tab switch, Raise); a bare FocusWindow is a within-tab move. Only the former co-surfaces the tab's other panes.
         let bringing_forward = effects.iter().any(|e| matches!(e, Effect::Render(_)));
@@ -64,7 +65,7 @@ impl Daemon {
                 Effect::FocusWindow(id) => {
                     if bringing_forward {
                         if let Some(tab) = self.model.as_ref().and_then(|m| m.focused_tab()) {
-                            for sib in vase_core::tree::windows(&tab.root) {
+                            for sib in crate::tree::windows(&tab.root) {
                                 if sib != id && self.last_shown.contains(&sib) {
                                     self.backend.focus(sib);
                                 }
@@ -95,7 +96,7 @@ impl Daemon {
         }
         self.restored = true;
         self.save_state(); // capture final layout before teardown
-        self.overlays.hide_bars();
+        self.chrome.hide_bars();
         let originals: Vec<(WindowId, Rect)> = self.windows.iter().map(|(id, w)| (id, w.original)).collect();
         for (id, rect) in &originals {
             self.backend.set_frame(*id, *rect);

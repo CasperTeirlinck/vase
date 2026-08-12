@@ -4,11 +4,13 @@ mod keys;
 
 use std::collections::HashSet;
 
-use vase_core::input::{Item, Switcher};
-use vase_core::tree::{find_window, windows, Node, WindowId};
+use crate::input::{Item, Switcher};
+use crate::tree::{find_window, windows, Node, WindowId};
 
 use super::switcher::{collect_children, Child};
 use super::Daemon;
+use crate::backend::Backend;
+use crate::chrome::Painter;
 
 /// A pane-picker entry: an existing window, a display-only header, or a launchable app.
 #[derive(Clone)]
@@ -38,7 +40,7 @@ pub struct PendingLaunch {
     pub ticks: u32,
 }
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// The picker's rows: existing windows as a nested tree, then launchable apps. Excludes only windows already in the focused pane's own node.
     fn build_pane_items(&self) -> Vec<(PickItem, String)> {
         let model = self.model.as_ref().unwrap();
@@ -90,8 +92,8 @@ impl Daemon {
         } else {
             self.favorites.push(app.clone());
         }
-        if let Some(path) = crate::paths::config() {
-            vase_core::config::Config::save_favorites(&path, &self.favorites);
+        if let Some(path) = &self.paths.config {
+            crate::config::Config::save_favorites(path, &self.favorites);
         }
         let items = self.build_pane_items();
         let mut s = Switcher::new(items);

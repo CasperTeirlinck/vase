@@ -6,6 +6,11 @@ use vase_core::chrome::theme::{theme, Role};
 
 pub(crate) use vase_core::chrome::theme::{mark, Mark, PANE_PAD, PANE_RADIUS};
 
+/// Resolve a palette role to an `NSColor`, for laid-out chrome that names colors by role.
+pub(crate) fn role(r: Role) -> Retained<NSColor> {
+    color(r)
+}
+
 fn color(role: Role) -> Retained<NSColor> {
     let c = theme().color(role);
     NSColor::colorWithSRGBRed_green_blue_alpha(c[0], c[1], c[2], c[3])

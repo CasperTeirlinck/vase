@@ -1,9 +1,22 @@
 //! Chrome is everything vase paints on top of the windows.
 
 pub mod bar;
+pub(crate) mod deck;
+mod paint;
 pub mod theme;
 
-pub use crate::geometry::BAR_HEIGHT;
+pub use crate::geometry::{Rect, BAR_HEIGHT};
+pub use deck::{Context, Deck};
+pub use paint::{ListAt, Painter, SwitchRow};
+
+/// The tileable area of a display: its work area, less the strip the tab bar reserves on the main one.
+pub fn usable(work_area: Rect, main: bool) -> Rect {
+    if main {
+        Rect::new(work_area.x, work_area.y, work_area.w, work_area.h - BAR_HEIGHT)
+    } else {
+        work_area
+    }
+}
 
 pub const FONT_SIZE: f64 = 12.0;
 

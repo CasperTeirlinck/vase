@@ -2,10 +2,12 @@
 
 mod keys;
 
-use vase_core::input::{Item, Switcher};
-use vase_core::tree::{windows, Node, Pane, WindowId};
+use crate::input::{Item, Switcher};
+use crate::tree::{windows, Node, Pane, WindowId};
 
 use super::Daemon;
+use crate::backend::Backend;
+use crate::chrome::Painter;
 
 /// What picking a switcher row does.
 #[derive(Clone, Copy)]
@@ -57,7 +59,7 @@ pub(crate) fn collect_children(node: &Node) -> Vec<Child> {
     }
 }
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     pub fn open_switcher(&mut self) {
         let model = self.model.as_ref().unwrap();
         let focused = model.focused_window();

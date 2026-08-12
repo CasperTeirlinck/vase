@@ -1,6 +1,5 @@
 pub mod ax;
 pub mod cg;
-pub mod daemon;
 pub mod dock;
 pub mod event_tap;
 pub mod keycode;
@@ -40,4 +39,4 @@ pub fn take_reload_config() -> bool {
 
 pub use ax::MacBackend;
 pub use event_tap::EventTap;
-pub use overlay::{nsapp_init, FocusBorder, PaneOverlay, SwitcherView, TabBar};
+pub use overlay::{nsapp_init, AppKitPainter};

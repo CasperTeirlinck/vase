@@ -18,6 +18,18 @@ impl Model {
         self.screens.iter().position(|s| s.current_tab().map(|t| leaf_pane(&t.root, pid).is_some()).unwrap_or(false))
     }
 
+    /// Split a flat (bar-order) tab index into `(screen, tab within that screen)`.
+    pub fn screen_tab(&self, flat: usize) -> Option<(usize, usize)> {
+        let mut acc = 0;
+        for (si, s) in self.screens.iter().enumerate() {
+            if flat < acc + s.tabs.len() {
+                return Some((si, flat - acc));
+            }
+            acc += s.tabs.len();
+        }
+        None
+    }
+
     /// Every managed window, across every screen's tabs (not just the visible ones).
     pub fn all_windows(&self) -> Vec<WindowId> {
         self.screens.iter().flat_map(|s| s.tabs.iter()).flat_map(|t| windows(&t.root)).collect()

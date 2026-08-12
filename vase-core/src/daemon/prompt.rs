@@ -1,10 +1,11 @@
 //! The bar command line (tab rename and `:` command), vim-style, and the small `:` verb set it runs.
 
-use vase_core::backend::Backend;
-use vase_core::input::{Key, KeyCode};
-use vase_core::model::Command;
+use crate::backend::Backend;
+use crate::input::{Key, KeyCode};
+use crate::model::Command;
 
 use super::Daemon;
+use crate::chrome::Painter;
 
 /// Which kind of bar command line is open.
 #[derive(Clone, Copy)]
@@ -25,7 +26,7 @@ impl PromptKind {
     }
 }
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Open the tab-rename prompt (prefix-t), seeded with the current tab's name.
     pub fn start_rename(&mut self) {
         let (tabs, cur) = self.model.as_ref().unwrap().bar_tabs();
@@ -90,7 +91,7 @@ impl Daemon {
 
     /// Run a `:` command line (`word [arg...]`).
     fn run_command(&mut self, line: &str) {
-        use vase_core::tree::Dir;
+        use crate::tree::Dir;
         let line = line.trim();
         let mut parts = line.splitn(2, char::is_whitespace);
         let verb = parts.next().unwrap_or("");
@@ -99,7 +100,7 @@ impl Daemon {
             "" => {}
             "q" | "quit" => {
                 self.restore();
-                crate::request_quit();
+                self.quit = true;
             }
             "rename" => {
                 let name = (!arg.is_empty()).then(|| arg.to_string());

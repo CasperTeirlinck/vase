@@ -176,14 +176,14 @@ impl Backend for WindowsBackend {
 
     /// Shortcut names from the Start Menu.
     fn launchable_apps(&self) -> Vec<String> {
-        let mut apps: Vec<String> = crate::paths::start_menu_dirs().iter().flat_map(|dir| walk_shortcuts(dir)).filter_map(|p| p.file_stem().and_then(|s| s.to_str()).map(str::to_string)).collect();
+        let mut apps: Vec<String> = crate::paths::start_menu_dirs().iter().flat_map(|dir| shortcuts(dir)).filter_map(|p| p.file_stem().and_then(|s| s.to_str()).map(str::to_string)).collect();
         apps.sort_by_key(|a| a.to_lowercase());
         apps.dedup();
         apps
     }
 
     fn launch(&self, app: &str) {
-        let Some(path) = crate::paths::start_menu_dirs().iter().flat_map(|dir| walk_shortcuts(dir)).find(|p| p.file_stem().and_then(|s| s.to_str()) == Some(app)) else {
+        let Some(path) = crate::paths::start_menu_dirs().iter().flat_map(|dir| shortcuts(dir)).find(|p| p.file_stem().and_then(|s| s.to_str()) == Some(app)) else {
             eprintln!("vase: no Start Menu entry for {app}");
             return;
         };
@@ -195,13 +195,13 @@ impl Backend for WindowsBackend {
 }
 
 /// Every `.lnk` under `dir`, recursively.
-fn walk_shortcuts(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+pub fn shortcuts(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
     let mut out = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            out.extend(walk_shortcuts(&path));
+            out.extend(shortcuts(&path));
         } else if path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("lnk")) {
             out.push(path);
         }

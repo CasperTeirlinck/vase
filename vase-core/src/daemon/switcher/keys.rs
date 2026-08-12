@@ -2,16 +2,18 @@
 
 use std::time::Instant;
 
-use vase_core::input::{Key, Pick};
-use vase_core::model::Command;
-use vase_core::registry::clean_title;
-use vase_core::tree::{windows, WindowId};
+use crate::input::{Key, Pick};
+use crate::model::Command;
+use crate::registry::clean_title;
+use crate::tree::{windows, WindowId};
 
 use super::SwitchTarget;
+use crate::backend::Backend;
+use crate::chrome::Painter;
+use crate::chrome::{ListAt, SwitchRow};
 use crate::daemon::Daemon;
-use crate::overlay::SwitchRow;
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// A window's cleaned title, or its app when the title is empty.
     pub(crate) fn title_of(&self, id: WindowId) -> String {
         let app = self.windows.app(id);
@@ -89,12 +91,12 @@ impl Daemon {
         let header = if is_searching { format!("/ {query}") } else { "  j / k  move    1-9  open    /  search    ⏎  open    esc  close".to_string() };
         // Always on the main (menu-bar) display.
         let screen = self.model.as_ref().unwrap().screens[self.main_screen].rect;
-        self.overlays.show_list(screen, &header, &rows, selected);
+        self.chrome.list(ListAt::Centered(screen), &header, &rows, selected);
     }
 
     fn close_switcher(&mut self) {
         self.switcher = None;
-        self.overlays.hide_list();
+        self.chrome.hide_list();
     }
 
     fn open_switch_target(&mut self, target: SwitchTarget) {

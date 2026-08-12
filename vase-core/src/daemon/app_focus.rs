@@ -1,12 +1,14 @@
 //! Global app-focus toggle hotkeys.
 
-use vase_core::input::Key;
-use vase_core::model::Command;
-use vase_core::registry::app_matches;
+use crate::input::Key;
+use crate::model::Command;
+use crate::registry::app_matches;
 
 use super::Daemon;
+use crate::backend::Backend;
+use crate::chrome::Painter;
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     /// The configured app to toggle focus to for `key`, if any.
     pub fn app_hotkey(&self, key: Key) -> Option<String> {
         self.app_hotkeys.iter().find(|h| h.key == key).map(|h| h.app.clone())
@@ -14,11 +16,11 @@ impl Daemon {
 
     /// Re-read config.toml and apply it (the menu-bar "Reload config" action).
     pub fn reload_config(&mut self) {
-        let config = crate::paths::load_config();
+        let config = self.paths.config.as_deref().map(crate::config::Config::load).unwrap_or_default();
         self.app_hotkeys = config.app_focus;
         self.favorites = config.favorites;
-        vase_core::chrome::theme::set_theme(config.theme);
-        vase_core::chrome::theme::set_mark(config.mark);
+        crate::chrome::theme::set_theme(config.theme);
+        crate::chrome::theme::set_mark(config.mark);
         self.refresh(); // palette, mark, and hotkey/favorite markers may have changed
     }
 

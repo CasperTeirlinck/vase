@@ -2,12 +2,14 @@
 
 use std::time::Instant;
 
-use vase_core::input::{Entry, Key, KeyCode, Mods};
-use vase_core::model::Command;
+use crate::input::{Entry, Key, KeyCode, Mods};
+use crate::model::Command;
 
 use super::Daemon;
+use crate::backend::Backend;
+use crate::chrome::Painter;
 
-impl Daemon {
+impl<B: Backend, C: Painter> Daemon<B, C> {
     fn total_tabs(&self) -> usize {
         self.model.as_ref().map_or(0, |m| m.screens.iter().map(|s| s.tabs.len()).sum())
     }
@@ -72,7 +74,7 @@ impl Daemon {
     /// Route a click at a CG point to whichever bar it landed on; returns whether it was ours.
     pub fn click(&mut self, px: f64, py: f64) -> bool {
         let Some(model) = &self.model else { return false };
-        match self.overlays.hit(model, px, py) {
+        match self.chrome.hit(model, px, py) {
             Some(cmd) => {
                 self.dispatch(cmd);
                 true
