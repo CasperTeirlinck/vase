@@ -5,7 +5,9 @@ use std::cell::RefCell;
 use std::io::Write;
 
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_LBUTTONDOWN, WM_SYSKEYDOWN,
 };
@@ -16,6 +18,20 @@ use crate::keycode::{key_code, VK_ESCAPE};
 
 /// Swallow the event.
 const CONSUME: LRESULT = LRESULT(1);
+
+/// Stamped on the masking keystroke below, so the hook can tell it apart from a real one.
+const INJECTED_BY_VASE: usize = 0x7661_7365;
+
+/// Tap Ctrl so the app sees a key between Alt going down and coming back up.
+///
+/// A chord vase swallows leaves the focused app having seen Alt pressed and released with nothing in
+/// between, which is precisely the gesture that opens a menu bar. Ctrl is the mask because it does
+/// nothing on its own.
+fn mask_modifier() {
+    let tap = |flags: KEYBD_EVENT_FLAGS| INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_CONTROL, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: INJECTED_BY_VASE } } };
+    let taps = [tap(KEYBD_EVENT_FLAGS(0)), tap(KEYEVENTF_KEYUP)];
+    unsafe { SendInput(&taps, std::mem::size_of::<INPUT>() as i32) };
+}
 
 struct State {
     router: KeyRouter,
@@ -95,6 +111,9 @@ fn handle_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> bool {
     }
     // SAFETY: for WH_KEYBOARD_LL with code >= 0, lparam is a KBDLLHOOKSTRUCT owned by the OS.
     let info = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+    if info.dwExtraInfo == INJECTED_BY_VASE {
+        return false;
+    }
     let vk = info.vkCode;
     let mods = mods();
 
@@ -127,14 +146,19 @@ fn handle_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> bool {
         if now_armed != was_armed {
             (st.on_arm)(now_armed);
         }
-        match decision {
+        let consumed = match decision {
             Decision::PassThrough => false,
             Decision::Consume => true,
             Decision::ConsumeAndRun(cmd) => {
                 (st.on_command)(cmd);
                 true
             }
+        };
+        // Only the modifiers that make a window do something on their own need masking.
+        if consumed && (key.mods.alt || key.mods.meta) {
+            mask_modifier();
         }
+        consumed
     })
 }
 

@@ -2,6 +2,7 @@ use crate::chrome::*;
 
 mod bar;
 mod deck;
+mod theme;
 
 #[test]
 fn scroll_offset_keeps_selection_in_view() {

@@ -14,14 +14,14 @@ use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_HARDWARE;
 use windows::Win32::Graphics::Direct3D11::{D3D11CreateDevice, ID3D11Device, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION};
 use windows::Win32::Graphics::DirectComposition::{DCompositionCreateDevice3, IDCompositionDesktopDevice, IDCompositionSurface, IDCompositionTarget, IDCompositionVisual2};
 use windows::Win32::Graphics::DirectWrite::{
-    DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_NORMAL,
-    DWRITE_TEXT_METRICS,
+    DWriteCreateFactory, IDWriteFactory, IDWriteInlineObject, IDWriteTextFormat, IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+    DWRITE_FONT_WEIGHT_NORMAL, DWRITE_TEXT_METRICS, DWRITE_TRIMMING, DWRITE_TRIMMING_GRANULARITY_CHARACTER, DWRITE_WORD_WRAPPING_NO_WRAP,
 };
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI_FORMAT_B8G8R8A8_UNORM};
 use windows::Win32::Graphics::Dxgi::{IDXGIDevice, IDXGISurface};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, RegisterClassW, SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, LoadCursorW, RegisterClassW, SetWindowPos, ShowWindow, HWND_TOPMOST, IDC_ARROW, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WNDCLASSW, WS_EX_NOACTIVATE,
+    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 use vase_core::chrome::theme::{theme, Role};
@@ -40,6 +40,8 @@ pub struct Gpu {
     /// Text formats by point size. Ellipsizing measures a label many times per redraw, and creating
     /// a format per measurement dominates the cost.
     formats: RefCell<HashMap<u64, IDWriteTextFormat>>,
+    /// Trimming signs, cached for the same reason and keyed the same way.
+    ellipses: RefCell<HashMap<u64, IDWriteInlineObject>>,
 }
 
 impl Gpu {
@@ -52,7 +54,7 @@ impl Gpu {
             let d2d = factory.CreateDevice(&dxgi)?.CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE)?;
             let dcomp: IDCompositionDesktopDevice = DCompositionCreateDevice3(&dxgi)?;
             let dwrite: IDWriteFactory = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)?;
-            Ok(Gpu { d2d, factory, dwrite, dcomp, formats: RefCell::new(HashMap::new()) })
+            Ok(Gpu { d2d, factory, dwrite, dcomp, formats: RefCell::new(HashMap::new()), ellipses: RefCell::new(HashMap::new()) })
         }
     }
 
@@ -80,6 +82,30 @@ impl Gpu {
     pub fn layout(&self, text: &str, size: f64) -> Result<IDWriteTextLayout> {
         let wide: Vec<u16> = text.encode_utf16().collect();
         unsafe { self.dwrite.CreateTextLayout(&wide, &self.format(size)?, f32::MAX, f32::MAX) }
+    }
+
+    /// A layout capped at `max`, ellipsized where it would overrun. The bar ellipsizes in the core
+    /// against `measure`, but a list row's width is the painter's own, so it trims here.
+    pub fn trimmed(&self, text: &str, size: f64, max: f64) -> Result<IDWriteTextLayout> {
+        let format = self.format(size)?;
+        let wide: Vec<u16> = text.encode_utf16().collect();
+        let layout = unsafe { self.dwrite.CreateTextLayout(&wide, &format, max.max(0.0) as f32, f32::MAX)? };
+        unsafe {
+            layout.SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP)?;
+            let trimming = DWRITE_TRIMMING { granularity: DWRITE_TRIMMING_GRANULARITY_CHARACTER, delimiter: 0, delimiterCount: 0 };
+            layout.SetTrimming(&trimming, &self.ellipsis(size)?)?;
+        }
+        Ok(layout)
+    }
+
+    fn ellipsis(&self, size: f64) -> Result<IDWriteInlineObject> {
+        let key = size.to_bits();
+        if let Some(sign) = self.ellipses.borrow().get(&key) {
+            return Ok(sign.clone());
+        }
+        let sign = unsafe { self.dwrite.CreateEllipsisTrimmingSign(&self.format(size)?)? };
+        self.ellipses.borrow_mut().insert(key, sign.clone());
+        Ok(sign)
     }
 
     /// Width of `text`, including trailing whitespace: the bar pads with spaces, and dropping them
@@ -197,7 +223,9 @@ fn register_class() {
     use std::sync::Once;
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        let class = WNDCLASSW { lpfnWndProc: Some(wndproc), lpszClassName: CLASS, ..Default::default() };
+        // Without a class cursor Windows leaves whatever the cursor already was, which after process
+        // start is the busy one: hovering the bar would show an hourglass forever.
+        let class = WNDCLASSW { lpfnWndProc: Some(wndproc), lpszClassName: CLASS, hCursor: unsafe { LoadCursorW(None, IDC_ARROW) }.unwrap_or_default(), ..Default::default() };
         unsafe { RegisterClassW(&class) };
     });
 }

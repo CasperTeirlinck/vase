@@ -2,7 +2,7 @@
 
 mod gpu;
 mod icons;
-mod paths;
+pub(crate) mod paths;
 
 use windows::Win32::Graphics::Direct2D::Common::D2D_RECT_F;
 use windows::Win32::Graphics::Direct2D::{ID2D1Brush, ID2D1DeviceContext, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_ROUNDED_RECT};
@@ -127,6 +127,7 @@ impl Painter for D2DPainter {
     }
 
     fn bar(&mut self, layout: &BarLayout) {
+        self.icons.collect(&self.gpu);
         Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, layout);
         self.gpu.commit();
     }
@@ -151,6 +152,7 @@ impl Painter for D2DPainter {
     }
 
     fn stack_bars(&mut self, layouts: &[BarLayout]) {
+        self.icons.collect(&self.gpu);
         while self.stack_bars.len() < layouts.len() {
             let Ok(surface) = Surface::new(&self.gpu) else { break };
             self.stack_bars.push(surface);
@@ -205,6 +207,7 @@ impl Painter for D2DPainter {
     }
 
     fn list(&mut self, at: ListAt, header: &str, rows: &[SwitchRow], selected: usize) {
+        self.icons.collect(&self.gpu);
         let (area, visible, border_role, border_w) = match at {
             ListAt::Centered(screen) => {
                 let shown = rows.len().min(LIST_MAX_ROWS);
@@ -228,8 +231,10 @@ impl Painter for D2DPainter {
             if let Ok(brush) = dc.CreateSolidColorBrush(&color(border_role), None) {
                 dc.DrawRoundedRectangle(&card, &brush, border_w as f32, None);
             }
+            // Every run is capped at the card's right padding, so nothing spills past the edge.
+            let room = |x: f64| area.w - x - PANE_PAD;
             if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Dim), None) {
-                draw_row_text(gpu, dc, header, PANE_PAD, PANE_PAD, &brush);
+                draw_row_text(gpu, dc, header, PANE_PAD, PANE_PAD, room(PANE_PAD), &brush);
             }
             for slot in 0..visible {
                 let Some(row) = rows.get(offset + slot) else { break };
@@ -248,19 +253,19 @@ impl Painter for D2DPainter {
                 let mut x = PANE_PAD;
                 let marker = bar::row_marker(row.favorite, row.off_workspace);
                 if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Accent), None) {
-                    draw_row_text(gpu, dc, marker, x, y, &brush);
+                    draw_row_text(gpu, dc, marker, x, y, room(x), &brush);
                 }
                 x += gpu.measure(marker, FONT_SIZE) + 4.0;
                 if row.number > 0 {
                     let n = format!("{:>2} ", row.number);
                     if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Dim), None) {
-                        draw_row_text(gpu, dc, &n, x, y, &brush);
+                        draw_row_text(gpu, dc, &n, x, y, room(x), &brush);
                     }
                     x += gpu.measure(&n, FONT_SIZE);
                 }
                 if !row.prefix.is_empty() {
                     if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Dim), None) {
-                        draw_row_text(gpu, dc, &row.prefix, x, y, &brush);
+                        draw_row_text(gpu, dc, &row.prefix, x, y, room(x), &brush);
                     }
                     x += gpu.measure(&row.prefix, FONT_SIZE);
                 }
@@ -272,7 +277,7 @@ impl Painter for D2DPainter {
                     x += 20.0;
                 }
                 if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Text), None) {
-                    draw_row_text(gpu, dc, &row.label, x, y, &brush);
+                    draw_row_text(gpu, dc, &row.label, x, y, room(x), &brush);
                 }
             }
         });
@@ -298,7 +303,7 @@ impl Painter for D2DPainter {
     }
 
     fn prewarm_icon(&mut self, app: &str) {
-        self.icons.warm(&self.gpu, app);
+        self.icons.warm(app);
     }
 }
 
@@ -324,9 +329,9 @@ fn draw_text(gpu: &Gpu, dc: &ID2D1DeviceContext, text: &str, size: f64, x: f64, 
     unsafe { dc.DrawTextLayout(Vector2 { X: x as f32, Y: y as f32 }, &layout, brush, D2D1_DRAW_TEXT_OPTIONS_NONE) };
 }
 
-/// Draw a list-row run at `x`, vertically centred in its row.
-fn draw_row_text(gpu: &Gpu, dc: &ID2D1DeviceContext, text: &str, x: f64, row_y: f64, brush: &ID2D1Brush) {
-    let Ok(layout) = gpu.layout(text, FONT_SIZE) else { return };
+/// Draw a list-row run at `x`, vertically centred in its row and ellipsized at `max`.
+fn draw_row_text(gpu: &Gpu, dc: &ID2D1DeviceContext, text: &str, x: f64, row_y: f64, max: f64, brush: &ID2D1Brush) {
+    let Ok(layout) = gpu.trimmed(text, FONT_SIZE, max) else { return };
     let mut m = DWRITE_TEXT_METRICS::default();
     let _ = unsafe { layout.GetMetrics(&mut m) };
     let y = row_y + (ROW_H - m.height as f64) / 2.0;

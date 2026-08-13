@@ -135,6 +135,32 @@ const CATPPUCCIN: Theme = Theme {
     hotkey: [0.804, 0.839, 0.957, 0.95],
 };
 
+/// Windows' Fluent palette, so the chrome can read as native there. Greys follow the Fluent neutral ramp.
+const FLUENT_DARK: Theme = Theme {
+    bg: [0.129, 0.129, 0.129, 1.0],
+    active: [0.216, 0.216, 0.216, 1.0],
+    dim_bg: [0.102, 0.102, 0.102, 1.0],
+    text: [1.000, 1.000, 1.000, 1.0],
+    dim: [0.612, 0.612, 0.612, 1.0],
+    accent: [0.376, 0.694, 0.910, 1.0],
+    badge: [1.000, 0.600, 0.600, 1.0],
+    border: [0.267, 0.267, 0.267, 1.0],
+    hotkey: [0.900, 0.900, 0.900, 0.95],
+};
+
+/// The only light palette vase ships.
+const FLUENT_LIGHT: Theme = Theme {
+    bg: [0.973, 0.973, 0.973, 1.0],     // SolidBackgroundFillColorBase
+    active: [0.902, 0.902, 0.902, 1.0], // ControlFillColorSecondary
+    dim_bg: [0.937, 0.937, 0.937, 1.0],
+    text: [0.100, 0.100, 0.100, 1.0], // TextFillColorPrimary
+    dim: [0.400, 0.400, 0.400, 1.0],  // TextFillColorSecondary
+    accent: [0.000, 0.475, 0.843, 1.0],
+    badge: [0.769, 0.169, 0.110, 1.0], // SystemFillColorCritical
+    border: [0.851, 0.851, 0.851, 1.0],
+    hotkey: [0.200, 0.200, 0.200, 0.95],
+};
+
 /// A built-in theme by config name.
 pub fn by_name(name: &str) -> Option<Theme> {
     match name.trim().to_lowercase().replace([' ', '_'], "-").as_str() {
@@ -143,9 +169,14 @@ pub fn by_name(name: &str) -> Option<Theme> {
         "gruvbox" | "gruvbox-dark" => Some(GRUVBOX),
         "tokyo-night" | "tokyonight" => Some(TOKYO_NIGHT),
         "catppuccin" | "catppuccin-mocha" => Some(CATPPUCCIN),
+        "fluent" | "fluent-dark" => Some(FLUENT_DARK),
+        "fluent-light" => Some(FLUENT_LIGHT),
         _ => None,
     }
 }
+
+/// Every built-in name, for the docs and for tests that must cover the whole set.
+pub const PRESETS: [&str; 7] = ["one-dark", "nord", "gruvbox", "tokyo-night", "catppuccin", "fluent-dark", "fluent-light"];
 
 /// Parse `#rgb`, `#rrggbb`, or `#rrggbbaa` into sRGBA in 0..1.
 pub fn parse_hex(s: &str) -> Option<[f64; 4]> {

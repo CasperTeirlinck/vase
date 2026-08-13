@@ -99,3 +99,7 @@ pub fn vase_mark(factory: &ID2D1Factory1, area: vase_core::geometry::Rect, h: f6
     }
     Ok(path)
 }
+
+#[cfg(test)]
+#[path = "paths_test.rs"]
+mod tests;

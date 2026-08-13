@@ -1,5 +1,11 @@
+// No console: vase is a background daemon with a tray icon, and a console window would be one more
+// window for it to tile. Diagnostics go to the log instead.
+#![windows_subsystem = "windows"]
+
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 use windows::Win32::UI::HiDpi::{SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2};
 use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, MsgWaitForMultipleObjectsEx, PeekMessageW, TranslateMessage, MSG, MWMO_INPUTAVAILABLE, PM_REMOVE, QS_ALLINPUT};
@@ -8,13 +14,16 @@ use vase_core::backend::{manageable, Backend};
 use vase_core::daemon::{Daemon, Paths};
 use vase_core::geometry::{screen_of, Rect};
 use vase_core::input::{InputCommand, Key};
-use vase_core::model::Effect;
+use vase_core::model::{Command, Effect};
 use vase_core::registry::Registry;
 use vase_core::state::LiveWindow;
 use vase_windows::{D2DPainter, Hooks, WindowsBackend};
 
 /// The daemon, bound to this platform's backend and painter.
 type Vase = Daemon<WindowsBackend, D2DPainter>;
+
+/// Hook work that arrived while the daemon was busy, waiting for the run loop to pick it up.
+type Deferred = Rc<RefCell<VecDeque<Box<dyn FnOnce(&mut Vase)>>>>;
 
 struct RestoreGuard(Rc<RefCell<Vase>>);
 impl Drop for RestoreGuard {
@@ -24,6 +33,7 @@ impl Drop for RestoreGuard {
 }
 
 fn main() {
+    vase_windows::log_to_file();
     // Per-monitor v2 first: without it Windows virtualizes coordinates on a scaled display and every
     // frame vase sets would land in the wrong place.
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
@@ -73,20 +83,70 @@ fn main() {
     // a panic before install has nothing to undo; the guard just becomes a no-op restore.
     let _guard = RestoreGuard(Rc::clone(&daemon));
 
+    // Anything the daemon does that pumps messages -- SetForegroundWindow, SetWindowPos, a
+    // composition commit -- lets Windows re-enter the hooks on this same thread, on top of a daemon
+    // that is already borrowed. Work that arrives mid-operation is parked here and run by the loop.
+    let deferred: Deferred = Rc::new(RefCell::new(VecDeque::new()));
+
     let daemon_cb = Rc::clone(&daemon);
-    let on_command = Box::new(move |cmd: InputCommand| daemon_cb.borrow_mut().run(cmd));
+    let queue_cb = Rc::clone(&deferred);
+    let on_command = Box::new(move |cmd: InputCommand| match daemon_cb.try_borrow_mut() {
+        Ok(mut d) => {
+            d.run(cmd);
+            vase_windows::set_modal(d.modal());
+        }
+        Err(_) => queue_cb.borrow_mut().push_back(Box::new(move |d: &mut Vase| d.run(cmd))),
+    });
 
     let daemon_click = Rc::clone(&daemon);
-    let on_click = Box::new(move |(px, py): (f64, f64)| -> bool { daemon_click.borrow_mut().click(px, py) });
+    let queue_click = Rc::clone(&deferred);
+    let on_click = Box::new(move |(px, py): (f64, f64)| -> bool {
+        match daemon_click.try_borrow_mut() {
+            Ok(mut d) => d.click(px, py),
+            // Routing needs the daemon, so a deferred click cannot say whether it lands on vase's
+            // own chrome. Passing it through is the safe half of that guess: the strip under the bar
+            // is reserved, so there is nothing behind it to disturb.
+            Err(_) => {
+                queue_click.borrow_mut().push_back(Box::new(move |d: &mut Vase| {
+                    d.click(px, py);
+                }));
+                false
+            }
+        }
+    });
 
     let daemon_key = Rc::clone(&daemon);
-    let on_key_intercept = Box::new(move |key: Key| -> bool { daemon_key.borrow_mut().intercept_key(key) });
+    let queue_key = Rc::clone(&deferred);
+    let on_key_intercept = Box::new(move |key: Key| -> bool {
+        match daemon_key.try_borrow_mut() {
+            Ok(mut d) => {
+                let intercepted = d.intercept_key(key);
+                vase_windows::set_modal(d.modal());
+                intercepted
+            }
+            // Busy mid-operation. An overlay's key has to be swallowed either way, or it lands in
+            // the focused app; with nothing modal open the router should see it as usual.
+            Err(_) if vase_windows::modal() => {
+                queue_key.borrow_mut().push_back(Box::new(move |d: &mut Vase| {
+                    d.intercept_key(key);
+                }));
+                true
+            }
+            Err(_) => false,
+        }
+    });
 
     let daemon_arm = Rc::clone(&daemon);
+    let queue_arm = Rc::clone(&deferred);
     let on_arm = Box::new(move |armed: bool| {
-        let mut d = daemon_arm.borrow_mut();
-        d.prefix_armed = armed;
-        d.refresh(); // recolor the prefix dot
+        let arm = move |d: &mut Vase| {
+            d.prefix_armed = armed;
+            d.refresh(); // recolor the prefix dot
+        };
+        match daemon_arm.try_borrow_mut() {
+            Ok(mut d) => arm(&mut d),
+            Err(_) => queue_arm.borrow_mut().push_back(Box::new(arm)),
+        }
     });
 
     let router = vase_core::input::router();
@@ -98,6 +158,12 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    // After the daemon, so the icon is drawn in the configured accent.
+    let tray = vase_windows::Tray::install(); // Held until main returns, keeping the icon alive.
+    if tray.is_none() {
+        eprintln!("vase: could not add the notification-area icon; the kill chord still quits.");
+    }
 
     // Only move windows once the hooks are confirmed live, so every reachable exit path from here on is
     // covered by the run loop + restore below.
@@ -113,29 +179,59 @@ fn main() {
     daemon.borrow_mut().warm_window_icons();
     daemon.borrow_mut().refresh();
 
-    run_message_loop(&daemon);
+    run_message_loop(&daemon, &deferred);
     daemon.borrow_mut().restore();
     println!("vase daemon: stopped, windows restored.");
 }
 
 /// The message loop, ticking the daemon each wake. The low-level hooks are delivered to this thread,
 /// so it has to keep pumping or Windows silently drops them.
-fn run_message_loop(daemon: &Rc<RefCell<Vase>>) {
+fn run_message_loop(daemon: &Rc<RefCell<Vase>>, deferred: &Deferred) {
+    const ICON_DRAW_INTERVAL: Duration = Duration::from_millis(150);
     let mut wake = 0u32;
+    let mut icons_pending = false;
+    let mut last_icon_draw = Instant::now();
     while !vase_windows::should_quit() && !daemon.borrow().quit_requested() {
+        // Popped before running, not during: an action is free to queue another, and a `while let`
+        // would still be holding the queue when it did.
+        loop {
+            let next = deferred.borrow_mut().pop_front();
+            let Some(action) = next else { break };
+            let mut d = daemon.borrow_mut();
+            action(&mut d);
+            vase_windows::set_modal(d.modal());
+        }
         unsafe {
             let mut msg = MSG::default();
             while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                icons_pending |= msg.message == vase_windows::ICONS_RESOLVED;
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
             // Block up to ~25 ms for the next input (keeps the prefix-number timeout crisp).
             MsgWaitForMultipleObjectsEx(None, 25, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         }
+        // Icons resolve about as fast as this loop turns, so redrawing per icon would cost hundreds
+        // of redraws on the thread the input hooks are delivered to. Rate-limited: an icon appears
+        // at most a tick late, which nobody can see.
+        if icons_pending && last_icon_draw.elapsed() >= ICON_DRAW_INTERVAL {
+            daemon.borrow_mut().refresh();
+            icons_pending = false;
+            last_icon_draw = Instant::now();
+        }
+        // Tray-menu actions queued from the menu's own dispatch.
+        if vase_windows::take_new_tab() {
+            daemon.borrow_mut().dispatch(Command::NewTab);
+        }
+        if vase_windows::take_reload_config() {
+            daemon.borrow_mut().reload_config();
+        }
         daemon.borrow_mut().tick_tab_entry();
         daemon.borrow_mut().tick_switcher();
         daemon.borrow_mut().tick_pane_picker();
         daemon.borrow_mut().tick_reframe();
+        // The ticks above can close an overlay on their own, so the mirror is refreshed here too.
+        vase_windows::set_modal(daemon.borrow().modal());
         wake += 1;
         // The window-list diff is expensive, so reconcile only every ~4th wake (~100 ms).
         if wake.is_multiple_of(4) {

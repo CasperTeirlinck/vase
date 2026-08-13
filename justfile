@@ -2,6 +2,7 @@ set shell := ["bash", "-uc"]
 
 bin := "target/release/vase"
 host_crates := if os() == "macos" { "-p vase-core -p vase-macos" } else if os() == "windows" { "-p vase-core -p vase-windows" } else { "-p vase-core" }
+app_crate := if os() == "macos" { "vase-macos" } else { "vase-windows" }
 windows_target := "x86_64-pc-windows-gnu"
 app := "dist/vase.app"
 version := `cd vase-macos && cargo read-manifest | jq -r .version`
@@ -10,7 +11,7 @@ default:
     @just --list
 
 build:
-    cargo build --release --bin vase
+    cargo build --release -p {{ app_crate }} --bin vase
 
 test:
     cargo test {{ host_crates }}

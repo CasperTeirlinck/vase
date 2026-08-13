@@ -9,6 +9,13 @@ use crate::backend::Backend;
 use crate::chrome::Painter;
 
 impl<B: Backend, C: Painter> Daemon<B, C> {
+    /// Whether an overlay is taking keys. Kept in step with the guards at the top of `intercept_key`,
+    /// for a platform that has to answer "is this key the overlay's?" at a moment when it cannot ask
+    /// the daemon itself.
+    pub fn modal(&self) -> bool {
+        self.pending_launch.is_some() || self.prompt.is_some() || self.switcher.is_some() || self.pane_picker.is_some() || self.tab_entry.is_pending()
+    }
+
     /// Offer a key to whatever is modal, before the prefix router sees it. Returns whether the key was swallowed. The order here *is* the modal precedence.
     pub fn intercept_key(&mut self, key: Key) -> bool {
         // A launch in flight makes its pane modal: only Esc, which cancels and collapses the pane.

@@ -24,7 +24,7 @@ You need a [Rust toolchain](https://rustup.rs) and [`just`](https://github.com/c
 | Command      | What it does                                                    |
 | ------------ | --------------------------------------------------------------- |
 | `just build` | Release build of the `vase` binary                              |
-| `just test`  | `cargo test --workspace`                                        |
+| `just test`  | `cargo test` for the core and this host's platform crate        |
 | `just check` | `cargo clippy` with warnings denied, plus `cargo fmt --check`   |
 | `just app`   | Bundles `dist/vase.app` for the host arch: `open dist/vase.app` |
 
