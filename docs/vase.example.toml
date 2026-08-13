@@ -1,10 +1,11 @@
-# vase config. On first run vase writes this to ~/Library/Application Support/vase/config.toml.
+# vase config. On first run vase writes this to ~/Library/Application Support/vase/config.toml on
+# macOS, and to %APPDATA%\vase\config.toml on Windows.
 
 # Favorite apps, shown first in the app picker. Toggle one from the picker with "f"; vase keeps this list updated.
 favorites = []
 
 # Color theme. Pick a built-in palette with `name` and/or override individual colors.
-# Built-in names: one-dark (default), nord, gruvbox, tokyo-night, catppuccin.
+# Built-in names: one-dark (default), nord, gruvbox, tokyo-night, catppuccin, fluent-dark, fluent-light.
 # [theme]
 # name = "one-dark"
 # accent = "#c7663c"   # the mark and every highlight (focus outline, current-row accent, markers)
@@ -18,8 +19,10 @@ favorites = []
 # hotkey = "#d9dee5"   # bright outline for a focus-hotkey tab
 
 # Tab-bar leading mark: "vase" (the logo, default), "" to hide it (the first tab then caps like a stack), or any glyph.
+# Position: "top" or "bottom".
 # [tabbar]
 # mark = "vase"
+# position = "top"
 
 # A global hotkey that toggles focus to an app: press the chord to bring it forward, press again to hide it.
 # Add one [[app_focus]] block per app.

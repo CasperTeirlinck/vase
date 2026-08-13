@@ -4,28 +4,17 @@ use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBox, NSBoxType, NSColor, NSFont, NSTextAlignment, NSTextField, NSTitlePosition};
 use objc2_foundation::{NSMutableAttributedString, NSPoint, NSRect, NSSize, NSString};
+use vase_core::chrome::{scroll_offset, SwitchRow};
 use vase_core::geometry::Rect;
 
 use super::panel::Panel;
-use super::text::{icon_run, scroll_offset, segment};
+use super::text::{icon_run, segment};
 use super::theme::*;
-use super::{FAVORITE_MARK, FONT_SIZE, SPACE_MARK};
+use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
 
 const SWITCHER_ROW_H: f64 = 28.0;
 const SWITCHER_WIDTH: f64 = 640.0;
 const SWITCHER_MAX_ITEMS: usize = 12;
-
-/// One switcher row.
-pub struct SwitchRow {
-    pub number: usize,
-    pub prefix: String,
-    pub icons: Vec<String>,
-    pub label: String,
-    pub dim: bool,       // on a non-focused monitor
-    pub off_space: bool, // the window is on another Space
-    pub favorite: bool,  // a favorite app (picker launch row)
-    pub current: bool,   // the currently-focused window
-}
 
 /// Where a list is framed and how its card is trimmed. The two framings differ only in these values; everything below the card is drawn the same way.
 struct Frame {
@@ -121,7 +110,7 @@ impl SwitcherView {
         let top = h - PANE_PAD;
         let qy = top - SWITCHER_ROW_H;
         // Reserve the marker gutter on every row once any row carries a marker, so index numbers stay column-aligned.
-        let reserve = items.iter().any(|r| r.off_space || r.favorite);
+        let reserve = items.iter().any(|r| r.off_workspace || r.favorite);
         let qlabel = self.make_label(0, "", &[], header, true, false, false, false, reserve, PANE_PAD, qy, inner_w);
         container.addSubview(&qlabel);
         labels.push(qlabel);
@@ -139,7 +128,7 @@ impl SwitcherView {
             if frame.accent && row.current {
                 container.addSubview(&self.bar(1.0, ry, 3.0, &accent()));
             }
-            let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, row.dim, row.off_space, row.favorite, reserve, PANE_PAD, ry, inner_w);
+            let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, row.dim, row.off_workspace, row.favorite, reserve, PANE_PAD, ry, inner_w);
             container.addSubview(&label);
             labels.push(label);
         }
@@ -157,7 +146,7 @@ impl SwitcherView {
         text: &str,
         is_query: bool,
         dim: bool,
-        off_space: bool,
+        off_workspace: bool,
         favorite: bool,
         reserve: bool,
         x: f64,
@@ -172,8 +161,8 @@ impl SwitcherView {
         if reserve {
             let glyph = if favorite {
                 FAVORITE_MARK
-            } else if off_space {
-                SPACE_MARK
+            } else if off_workspace {
+                WORKSPACE_MARK
             } else {
                 " "
             };

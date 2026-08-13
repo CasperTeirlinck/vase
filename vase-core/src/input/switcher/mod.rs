@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use super::{keys, Entry, Key, Mods, NumberEntry};
+use super::{Entry, Key, KeyCode, Mods, NumberEntry};
 
 mod nav;
 
@@ -54,7 +54,7 @@ impl<T: Item> Switcher<T> {
     pub fn key(&mut self, key: Key, now: Instant) -> Pick<T> {
         // A digit in navigate mode picks a numbered row.
         if !self.searching && key.mods == Mods::default() {
-            if let Some(d) = keys::char_for_keycode(key.code).and_then(|c| c.to_digit(10)) {
+            if let Some(d) = key.code.char().and_then(|c| c.to_digit(10)) {
                 return match self.entry.digit(d as usize, self.numbered_len(), now) {
                     Entry::Commit(n) => self.take_numbered(n),
                     _ => Pick::Ignored,
@@ -64,10 +64,10 @@ impl<T: Item> Switcher<T> {
         // Any other key abandons a half-typed index rather than committing it: here the list is still on screen, so the keystroke is navigation, not the end of a pick.
         self.entry.cancel();
 
-        if key.code == keys::VK_RETURN {
+        if key.code == KeyCode::Return {
             return self.take_selected();
         }
-        if key.code == keys::VK_ESC {
+        if key.code == KeyCode::Escape {
             if !self.searching {
                 return Pick::Cancelled;
             }
@@ -78,7 +78,7 @@ impl<T: Item> Switcher<T> {
         }
 
         // Resolve a pending `g` (gg → top) before moving.
-        let g = key.code == keys::VK_G && !key.mods.shift && !self.searching;
+        let g = key.code == KeyCode::Char('g') && !key.mods.shift && !self.searching;
         let go_top = g && std::mem::take(&mut self.g_pending);
         if g && !go_top {
             self.g_pending = true;
@@ -86,21 +86,21 @@ impl<T: Item> Switcher<T> {
         }
         self.g_pending = false;
 
-        if key.code == keys::VK_UP_ARROW {
+        if key.code == KeyCode::Up {
             self.step(-1);
-        } else if key.code == keys::VK_DOWN_ARROW {
+        } else if key.code == KeyCode::Down {
             self.step(1);
         } else if go_top {
             self.selected = 0;
             self.settle(1);
-        } else if key.code == keys::VK_G && key.mods.shift && !self.searching {
+        } else if key.code == KeyCode::Char('g') && key.mods.shift && !self.searching {
             self.selected = self.visible_len().saturating_sub(1);
             self.settle(-1);
         } else if self.searching {
-            if key.code == keys::VK_DELETE {
+            if key.code == KeyCode::Backspace {
                 self.query.pop();
             } else if key.mods == Mods::default() {
-                match keys::char_for_keycode(key.code) {
+                match key.code.char() {
                     Some(c) => self.query.push(c),
                     None => return Pick::Ignored,
                 }
@@ -110,7 +110,7 @@ impl<T: Item> Switcher<T> {
             self.clamp();
             self.settle(1);
         } else if key.mods == Mods::default() {
-            match keys::char_for_keycode(key.code) {
+            match key.code.char() {
                 Some('j') => self.step(1),
                 Some('k') => self.step(-1),
                 Some('/') => {

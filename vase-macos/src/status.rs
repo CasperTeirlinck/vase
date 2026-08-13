@@ -32,7 +32,7 @@ define_class!(
         // Open the config file in the user's default text editor.
         #[unsafe(method(openSettings:))]
         fn open_settings(&self, _sender: Option<&AnyObject>) {
-            if let Some(path) = crate::config::ensure_path() {
+            if let Some(path) = crate::paths::ensure_config() {
                 let _ = std::process::Command::new("open").arg("-t").arg(path).spawn();
             }
         }

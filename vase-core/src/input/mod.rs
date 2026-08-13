@@ -1,43 +1,63 @@
 use std::collections::HashMap;
 
-pub mod keys;
-
 mod entry;
+mod keycode;
+pub(crate) mod keymap;
 mod switcher;
 
 pub use entry::*;
+pub use keycode::KeyCode;
+pub use keymap::router;
 pub use switcher::*;
 
 /// Active modifier set on a key event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Mods {
-    pub cmd: bool,
+    /// Command on macOS, the Windows key on Windows.
+    pub meta: bool,
     pub ctrl: bool,
     pub alt: bool,
     pub shift: bool,
 }
 
-/// A key press: keycode plus modifiers.
+impl Mods {
+    /// Whether only Shift is held, for the sticky repeat keys that outlive the prefix.
+    pub fn shift_only(self) -> bool {
+        self.shift && !self.meta && !self.ctrl && !self.alt
+    }
+
+    /// Whether the key types text rather than invoking a chord.
+    pub fn is_typing(self) -> bool {
+        !self.meta && !self.ctrl && !self.alt
+    }
+}
+
+/// A key press: key identity plus modifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Key {
-    pub code: u16,
+    pub code: KeyCode,
     pub mods: Mods,
 }
 
 impl Key {
     /// A key with no modifiers.
-    pub fn plain(code: u16) -> Self {
+    pub fn plain(code: KeyCode) -> Self {
         Key { code, mods: Mods::default() }
     }
 
-    /// A key with only the Command modifier.
-    pub fn cmd(code: u16) -> Self {
-        Key { code, mods: Mods { cmd: true, ..Mods::default() } }
+    /// A key with only the Meta (Command / Windows) modifier.
+    pub fn meta(code: KeyCode) -> Self {
+        Key { code, mods: Mods { meta: true, ..Mods::default() } }
     }
 
     /// A key with only the Alt/Option modifier.
-    pub fn alt(code: u16) -> Self {
+    pub fn alt(code: KeyCode) -> Self {
         Key { code, mods: Mods { alt: true, ..Mods::default() } }
+    }
+
+    /// A plain letter/digit/punctuation key.
+    pub fn ch(c: char) -> Self {
+        Key::plain(KeyCode::Char(c))
     }
 }
 

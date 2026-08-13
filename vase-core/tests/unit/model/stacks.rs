@@ -71,7 +71,7 @@ fn stack_select_and_move_and_name() {
 fn placements_place_only_the_selected_stack_item() {
     let (m, _) = apply(one(&[win(1), win(2)]), Command::Stackify);
     let (m, _) = apply(m, Command::FillPane(win(2))); // stack [W1, W2] sel 1
-    let content = Rect::new(0.0, STACK_BAR_H, 100.0, 100.0 - STACK_BAR_H);
+    let content = Rect::new(0.0, BAR_HEIGHT, 100.0, 100.0 - BAR_HEIGHT);
     assert_eq!(m.placements(), vec![(win(2), content)]);
 }
 

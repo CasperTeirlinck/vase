@@ -60,7 +60,7 @@ pub enum Command {
 }
 
 impl Command {
-    /// The model edit a binding maps to. `None` for the bindings that drive the daemon itself rather than the model: opening an overlay, renaming, jumping to the last window, quitting.
+    /// The model edit a binding maps to. `None` for the bindings that drive the daemon itself rather than the model.
     pub fn from_input(input: &InputCommand) -> Option<Command> {
         use Direction::{Down, Left, Right, Up};
         use InputCommand as I;

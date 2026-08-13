@@ -26,7 +26,7 @@ pub(crate) fn rebuild_children(children: Vec<Node>, mut f: impl FnMut(Node) -> O
     }
 }
 
-/// Empty → None, single child → that child (unwrap the container), else rebuild.
+/// Reduce a container to the smallest equivalent node.
 fn collapse(kept: Vec<Node>, rebuild: impl FnOnce(Vec<Node>) -> Node) -> Option<Node> {
     match kept.len() {
         0 => None,

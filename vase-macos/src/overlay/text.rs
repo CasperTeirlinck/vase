@@ -53,15 +53,6 @@ pub(crate) fn icon_run(name: &str, size: f64, font: &NSFont) -> Option<Retained<
     Some(NSAttributedString::attributedStringWithAttachment(&att))
 }
 
-/// Scroll offset so a `selected` row stays within a window of `visible` rows.
-pub(crate) fn scroll_offset(selected: usize, visible: usize) -> usize {
-    if visible == 0 || selected < visible {
-        0
-    } else {
-        selected - visible + 1
-    }
-}
-
 /// One styled run: font + color, optionally an obliqueness (fake-italic slant).
 // NSObliquenessAttributeName is deprecated under TextKit 2 but is still the only fake-italic knob; NSTextField honors it via its TextKit 1 fallback.
 #[allow(deprecated)]

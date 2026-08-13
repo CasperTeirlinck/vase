@@ -12,7 +12,7 @@ pub fn split_pane(node: Node, target: PaneId, dir: Dir, new_id: PaneId) -> Optio
     }
 }
 
-/// Drop the leaf holding `id`, collapsing containers that end up empty (→ dropped) or single-child (→ replaced by that child). `None` if the whole subtree is now empty.
+/// Drop the leaf holding `id`, collapsing containers left empty or single-child. `None` if the whole subtree is now empty.
 pub fn remove_leaf_with_window(node: Node, id: WindowId) -> Option<Node> {
     match node {
         Node::Leaf { id: pid, pane } => match pane {
@@ -43,7 +43,7 @@ pub fn remove_leaf_with_window(node: Node, id: WindowId) -> Option<Node> {
     }
 }
 
-/// Drop the leaf with `target`, collapsing containers that end up empty (→ dropped) or single-child (→ replaced by that child). `None` if the whole subtree is now empty.
+/// Drop the leaf with `target`, collapsing containers left empty or single-child. `None` if the whole subtree is now empty.
 pub fn remove_leaf(node: Node, target: PaneId) -> Option<Node> {
     match node {
         Node::Leaf { id, pane } => {

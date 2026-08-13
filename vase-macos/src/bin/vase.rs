@@ -5,16 +5,19 @@ use std::rc::Rc;
 use objc2_app_kit::{NSApplication, NSEventMask};
 use objc2_foundation::{NSDate, NSDefaultRunLoopMode};
 use vase_core::backend::{manageable, Backend};
-use vase_core::geometry::Rect;
+use vase_core::daemon::{Daemon, Paths};
+use vase_core::geometry::{screen_of, Rect};
 use vase_core::input::{InputCommand, Key};
 use vase_core::model::{Command, Effect};
+use vase_core::registry::Registry;
+use vase_core::state::LiveWindow;
 use vase_core::tree::WindowId;
-use vase_macos::daemon::{screen_of, Daemon};
-use vase_macos::registry::Registry;
-use vase_macos::state::LiveWindow;
-use vase_macos::{nsapp_init, EventTap, MacBackend};
+use vase_macos::{nsapp_init, AppKitPainter, EventTap, MacBackend};
 
-struct RestoreGuard(Rc<RefCell<Daemon>>);
+/// The daemon, bound to this platform's backend and painter.
+type Vase = Daemon<MacBackend, AppKitPainter>;
+
+struct RestoreGuard(Rc<RefCell<Vase>>);
 impl Drop for RestoreGuard {
     fn drop(&mut self) {
         self.0.borrow_mut().restore();
@@ -26,28 +29,30 @@ fn main() {
     nsapp_init(mtm);
     let _status_bar = vase_macos::status::install(mtm); // Held until main returns, keeping the menu-bar item alive.
 
-    let mut backend = MacBackend::new();
-    let mut screens = vase_macos::overlay::all_screens(mtm);
-    if screens.is_empty() {
+    let mut backend = MacBackend::new(mtm);
+    // Displays come back ordered left-to-right, then top-to-bottom, so a screen's index matches its
+    // physical layout (the tab bar groups tabs by screen in index order, and cycling traverses it the same way).
+    let displays = backend.displays();
+    if displays.is_empty() {
         eprintln!("no screens - grant Accessibility (and Input Monitoring), then re-run.");
         std::process::exit(1);
     }
-    sort_displays_by_position(&mut screens);
     // Stable display id + full CG (CoreGraphics) bounds per display. Ids match tabs to monitors across hotplug; full bounds assign a window to a monitor by center.
-    let display_ids: Vec<u32> = screens.iter().map(|(id, _, _)| *id).collect();
-    let screens_cg: Vec<Rect> = screens.iter().map(|(_, full, _)| *full).collect();
+    let display_ids: Vec<u32> = displays.iter().map(|d| d.id).collect();
+    let screens_cg: Vec<Rect> = displays.iter().map(|d| d.bounds).collect();
     // The main display is the one at the CG global origin (0,0).
     let main_screen = screens_cg.iter().position(|r| r.x == 0.0 && r.y == 0.0).unwrap_or(0);
-
-    // Usable rect per monitor = that display's visible frame (already excludes its own menu bar and Dock); the main display also reserves a bottom strip for the tab bar.
-    let screen_rects: Vec<Rect> =
-        screens.iter().enumerate().map(|(i, (_, _, vis))| if i == main_screen { Rect::new(vis.x, vis.y, vis.w, vis.h - vase_macos::overlay::BAR_HEIGHT) } else { *vis }).collect();
+    // The bar's edge decides which strip the layout gives up, so it has to be known before the
+    // screens are cut. The daemon resolves it the same way for itself.
+    let bar_position = vase_macos::paths::load_config().bar_position.unwrap_or(backend.default_bar_position());
+    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen, bar_position)).collect();
 
     // Adopt every on-screen manageable window, plus the ones already minimized: scan the full window list (all Spaces) and keep only the ones AX confirms are minimized,
     // so we don't pull in other Spaces' or background windows. Minimized ones show as tabs but aren't placed until selected.
     let onscreen = backend.list_windows();
     let onscreen_ids: HashSet<WindowId> = onscreen.iter().map(|w| w.id).collect();
-    let offscreen: Vec<_> = vase_macos::cg::all_windows().into_iter().filter(|w| !onscreen_ids.contains(&w.id) && manageable(w) && backend.minimized_info(w) == Some(true)).collect();
+    let all = backend.all_windows();
+    let offscreen: Vec<_> = all.into_iter().filter(|w| !onscreen_ids.contains(&w.id) && manageable(w) && backend.minimized_info(w) == Some(true)).collect();
     let minimized: HashSet<WindowId> = offscreen.iter().map(|w| w.id).collect();
 
     let mut windows = Registry::default();
@@ -61,13 +66,15 @@ fn main() {
     }
     println!("adopted {} windows as tabs.", live.len());
 
-    let saved = vase_macos::state::load();
+    let paths = Paths { config: vase_macos::paths::config(), state: vase_macos::paths::state() };
+    let saved = paths.state.as_deref().and_then(vase_core::state::load);
     if saved.is_some() {
         println!("restored saved layout.");
     }
-    let model = vase_macos::state::restore(saved, &live, &screen_rects);
+    let model = vase_core::state::restore(saved, &live, &screen_rects);
 
-    let daemon = Rc::new(RefCell::new(Daemon::new(mtm, model, backend, windows, main_screen, screens_cg, display_ids)));
+    let painter = AppKitPainter::new(mtm);
+    let daemon = Rc::new(RefCell::new(Vase::new(model, backend, painter, windows, paths, main_screen, screens_cg, display_ids)));
     // Armed now, before the tap exists: nothing has been moved yet (adoption above only reads frames), so a panic before install has nothing to undo; the guard just becomes a no-op restore.
     let _guard = RestoreGuard(Rc::clone(&daemon));
 
@@ -87,7 +94,7 @@ fn main() {
         d.refresh(); // recolor the prefix dot
     });
 
-    let router = vase_macos::keymap::router();
+    let router = vase_core::input::router();
     let tap = match EventTap::install(router, on_command, on_click, on_key_intercept, on_arm) {
         Some(t) => t,
         None => {
@@ -117,11 +124,11 @@ fn main() {
 }
 
 /// AppKit's event loop, ticking the daemon each wake, until the user quits, the kill chord, or a crash; nothing is parked off-screen, so an abrupt exit leaves windows visible.
-fn run_event_loop(mtm: objc2::MainThreadMarker, daemon: &Rc<RefCell<Daemon>>, tap: &EventTap) {
+fn run_event_loop(mtm: objc2::MainThreadMarker, daemon: &Rc<RefCell<Vase>>, tap: &EventTap) {
     let app = NSApplication::sharedApplication(mtm);
     let mode = unsafe { NSDefaultRunLoopMode };
     let mut wake = 0u32;
-    while !vase_macos::should_quit() {
+    while !vase_macos::should_quit() && !daemon.borrow().quit_requested() {
         // Block up to ~25 ms for the next event (keeps the prefix-number timeout crisp), dispatch it, then drain any others.
         // Servicing events here also drives the CFRunLoop (the tap is on common modes) and lets the status-item menu act.
         let deadline = NSDate::dateWithTimeIntervalSinceNow(0.025);
@@ -151,10 +158,4 @@ fn run_event_loop(mtm: objc2::MainThreadMarker, daemon: &Rc<RefCell<Daemon>>, ta
             daemon.borrow_mut().warm_icons();
         }
     }
-}
-
-/// Order displays left-to-right, then top-to-bottom, so a screen's index matches its physical layout
-/// (the tab bar groups tabs by screen in index order, and tab cycling traverses the bar the same way).
-fn sort_displays_by_position(screens: &mut [(u32, Rect, Rect)]) {
-    screens.sort_by(|a, b| a.1.x.partial_cmp(&b.1.x).unwrap_or(std::cmp::Ordering::Equal).then(a.1.y.partial_cmp(&b.1.y).unwrap_or(std::cmp::Ordering::Equal)));
 }
