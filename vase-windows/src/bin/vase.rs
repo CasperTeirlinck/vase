@@ -83,9 +83,9 @@ fn main() {
     // a panic before install has nothing to undo; the guard just becomes a no-op restore.
     let _guard = RestoreGuard(Rc::clone(&daemon));
 
-    // Anything the daemon does that pumps messages -- SetForegroundWindow, SetWindowPos, a
-    // composition commit -- lets Windows re-enter the hooks on this same thread, on top of a daemon
-    // that is already borrowed. Work that arrives mid-operation is parked here and run by the loop.
+    // SetForegroundWindow, SetWindowPos and a composition commit all pump messages, which lets Windows
+    // re-enter the hooks on this same thread on top of a daemon that is already borrowed. Work that
+    // arrives mid-operation is parked here and run by the loop.
     let deferred: Deferred = Rc::new(RefCell::new(VecDeque::new()));
 
     let daemon_cb = Rc::clone(&daemon);
@@ -192,8 +192,8 @@ fn run_message_loop(daemon: &Rc<RefCell<Vase>>, deferred: &Deferred) {
     let mut icons_pending = false;
     let mut last_icon_draw = Instant::now();
     while !vase_windows::should_quit() && !daemon.borrow().quit_requested() {
-        // Popped before running, not during: an action is free to queue another, and a `while let`
-        // would still be holding the queue when it did.
+        // Popped before running, not during: an action is free to queue another, so the queue cannot
+        // stay borrowed across one.
         loop {
             let next = deferred.borrow_mut().pop_front();
             let Some(action) = next else { break };

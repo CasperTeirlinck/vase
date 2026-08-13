@@ -5,7 +5,7 @@ use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 fn the_mark_rasterizes_into_a_square_of_its_own() {
     // WIC is a COM object, and the daemon's own apartment is set up long before the tray exists.
     let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
-    let pixels = render().expect("the mark has to rasterize");
+    let pixels = render().unwrap();
     assert_eq!(pixels.len(), (SIZE * SIZE * 4) as usize);
 
     let alpha: Vec<u8> = pixels.chunks(4).map(|p| p[3]).collect();

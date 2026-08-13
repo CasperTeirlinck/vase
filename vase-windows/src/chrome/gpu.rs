@@ -223,8 +223,9 @@ fn register_class() {
     use std::sync::Once;
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
-        // Without a class cursor Windows leaves whatever the cursor already was, which after process
-        // start is the busy one: hovering the bar would show an hourglass forever.
+        // A class with no cursor makes its windows keep whatever the cursor already was, which after
+        // process start is the busy one: hovering the bar would show an hourglass forever.
+        // <https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-wndclassw>
         let class = WNDCLASSW { lpfnWndProc: Some(wndproc), lpszClassName: CLASS, hCursor: unsafe { LoadCursorW(None, IDC_ARROW) }.unwrap_or_default(), ..Default::default() };
         unsafe { RegisterClassW(&class) };
     });

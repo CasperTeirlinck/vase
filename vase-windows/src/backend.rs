@@ -147,6 +147,7 @@ impl Backend for WindowsBackend {
             // taskbar flash. Zero for the duration of the swap, then put the user's value back.
             // No SPIF_SENDCHANGE: that broadcasts WM_SETTINGCHANGE to every top-level window and
             // blocks on their replies, which on this thread means dropped input events.
+            // <https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow>
             let quietly = SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0);
             let mut lock_timeout = 0u32;
             let saved = SystemParametersInfoW(SPI_GETFOREGROUNDLOCKTIMEOUT, 0, Some(&mut lock_timeout as *mut u32 as *mut c_void), quietly).is_ok();
@@ -251,10 +252,9 @@ impl Backend for WindowsBackend {
 }
 
 /// Every app the shell can launch, as `(display name, shell path)`.
-///
-/// The Applications folder rather than the Start Menu: a packaged app has no `.lnk` anywhere on
-/// disk, so walking the Start Menu misses Terminal, Calculator and everything else from the Store.
 pub(crate) fn installed_apps() -> Vec<(String, String)> {
+    // A packaged app has no `.lnk` anywhere on disk, so the Applications folder is the only listing
+    // that carries both it and a classic app.
     let mut apps = Vec::new();
     unsafe {
         let folder: IShellItem = match SHCreateItemFromParsingName(APPS_FOLDER, None) {
@@ -338,10 +338,10 @@ fn process_name(pid: u32) -> Option<String> {
     exe_path(pid)?.file_stem().and_then(|s| s.to_str()).map(str::to_string)
 }
 
-/// Move a window so its *visible* frame is `frame`. Since Windows 10 a window's real rectangle is
-/// inset from `GetWindowRect` by an invisible resize border; place by the border and neighbouring
-/// panes show a gap where it is.
+/// Move a window so its visible frame is `frame`.
 fn place(hwnd: HWND, frame: Rect) {
+    // Since Windows 10 a window's real rectangle is inset from `GetWindowRect` by an invisible
+    // resize border. Place by the visible (DWM) frame, or neighbouring panes show a gap.
     let (Some(outer), Some(visible)) = (window_rect(hwnd), dwm_frame(hwnd)) else {
         let _ = unsafe { SetWindowPos(hwnd, None, frame.x as i32, frame.y as i32, frame.w as i32, frame.h as i32, SWP_NOACTIVATE | SWP_NOZORDER) };
         return;

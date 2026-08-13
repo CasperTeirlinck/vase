@@ -17,7 +17,7 @@ use vase_core::geometry::{bbox, Rect};
 use gpu::{color, Gpu, Surface};
 use icons::Icons;
 
-/// Row height in a list, matching the macOS chrome.
+/// Row height in a list.
 const ROW_H: f64 = 28.0;
 const LIST_WIDTH: f64 = 640.0;
 const LIST_MAX_ROWS: usize = 12;

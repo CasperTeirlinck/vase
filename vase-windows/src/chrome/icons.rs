@@ -84,8 +84,8 @@ fn spawn_resolver() -> (Sender<String>, Receiver<(String, Option<Image>)>) {
     std::thread::spawn(move || {
         // The shell calls below are COM, and this is not the thread the daemon initialized.
         let _ = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
-        // Enumerated once: the Applications folder holds hundreds of entries, and walking it per
-        // lookup was most of what made resolving an icon slow.
+        // Enumerated once: the Applications folder holds hundreds of entries, so walking it per lookup
+        // would dominate the cost of resolving an icon.
         let installed: HashMap<String, String> = crate::backend::installed_apps().into_iter().collect();
         for app in inbox {
             let image = icon_source(&app, &installed).and_then(|target| load(&target));
@@ -99,11 +99,9 @@ fn spawn_resolver() -> (Sender<String>, Receiver<(String, Option<Image>)>) {
 }
 
 /// What the shell should be asked to draw for `app`.
-///
-/// Windows has no name-to-icon service the way `NSWorkspace` does, so vase resolves the name back to
-/// something the shell knows. The two names it hands out come from different places: a window's app
-/// is its executable's stem, and a picker launch row's is an installed app's display name.
 fn icon_source(app: &str, installed: &HashMap<String, String>) -> Option<String> {
+    // The two kinds of name vase hands out come from different places: a window's app is its
+    // executable's stem, and a picker launch row's is an installed app's display name.
     match running_exe(app) {
         Some(exe) => Some(exe.to_string_lossy().into_owned()),
         None => installed.get(app).cloned(),
@@ -132,12 +130,11 @@ fn running_exe(app: &str) -> Option<PathBuf> {
 }
 
 /// The pixels the shell draws for `target`, which is an executable's path or an app's shell path.
-///
-/// Through the shell item rather than the file: a packaged app is not a file at all, and its logo
-/// lives in its manifest where only the shell can reach it.
 fn load(target: &str) -> Option<Image> {
     let wide = to_wide(target);
     unsafe {
+        // A shell item, not a file: a packaged app is not a file at all, and its logo lives in its
+        // manifest where only the shell can reach it.
         let item: IShellItemImageFactory = SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None).ok()?;
         let bitmap = item.GetImage(SIZE { cx: ICON_PX, cy: ICON_PX }, SIIGBF_ICONONLY).ok()?;
         // WIC is the route from a GDI bitmap to the premultiplied pixels Direct2D wants.

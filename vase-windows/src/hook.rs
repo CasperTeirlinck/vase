@@ -23,11 +23,9 @@ const CONSUME: LRESULT = LRESULT(1);
 const INJECTED_BY_VASE: usize = 0x7661_7365;
 
 /// Tap Ctrl so the app sees a key between Alt going down and coming back up.
-///
-/// A chord vase swallows leaves the focused app having seen Alt pressed and released with nothing in
-/// between, which is precisely the gesture that opens a menu bar. Ctrl is the mask because it does
-/// nothing on its own.
 fn mask_modifier() {
+    // A swallowed chord leaves the app having seen Alt pressed and released with nothing in between,
+    // which is precisely the gesture that opens a menu bar. Ctrl masks it by doing nothing on its own.
     let tap = |flags: KEYBD_EVENT_FLAGS| INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_CONTROL, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: INJECTED_BY_VASE } } };
     let taps = [tap(KEYBD_EVENT_FLAGS(0)), tap(KEYEVENTF_KEYUP)];
     unsafe { SendInput(&taps, std::mem::size_of::<INPUT>() as i32) };
@@ -117,7 +115,7 @@ fn handle_key(code: i32, wparam: WPARAM, lparam: LPARAM) -> bool {
     let vk = info.vkCode;
     let mods = mods();
 
-    // Safety layer 3: hardcoded kill chord Ctrl+Alt+Win+Esc → release the keyboard.
+    // Safety layer 3: the kill chord releases the keyboard whatever the router is doing.
     if vk == VK_ESCAPE && mods.meta && mods.ctrl && mods.alt {
         crate::request_quit();
         return true;
