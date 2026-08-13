@@ -43,8 +43,8 @@ app ver=version: build
 # Universal (arm64 + x86_64) build; produces both release artifacts: dist/vase-vX.Y.Z-macos.zip: the vase.app bundle (download, cask), dist/vase-vX.Y.Z-macos.tar.gz:  the bare vase binary  (formula, install.sh)
 release ver=version:
     rustup target add aarch64-apple-darwin x86_64-apple-darwin
-    cargo build --release --bin vase --target aarch64-apple-darwin
-    cargo build --release --bin vase --target x86_64-apple-darwin
+    cargo build --release -p vase-macos --bin vase --target aarch64-apple-darwin
+    cargo build --release -p vase-macos --bin vase --target x86_64-apple-darwin
     mkdir -p dist
     lipo -create -output dist/vase \
         target/aarch64-apple-darwin/release/vase \
