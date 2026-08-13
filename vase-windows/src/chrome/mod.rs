@@ -196,7 +196,8 @@ impl Painter for D2DPainter {
             self.focus.hide();
             return;
         };
-        let _ = self.focus.draw(&self.gpu, rect, |dc| unsafe {
+        // The band has to hold the whole outline, whose rounded corners bow inwards by the radius.
+        let _ = self.focus.draw_outline(&self.gpu, rect, PANE_RADIUS + 2.0, |dc| unsafe {
             if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Accent), None) {
                 // Inset by half the stroke so the 2px outline is not clipped at the surface edge.
                 let rounded = D2D1_ROUNDED_RECT { rect: rect_f(1.0, 1.0, rect.w - 2.0, rect.h - 2.0), radiusX: PANE_RADIUS as f32, radiusY: PANE_RADIUS as f32 };

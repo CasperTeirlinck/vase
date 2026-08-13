@@ -19,6 +19,7 @@ use windows::Win32::Graphics::DirectWrite::{
 };
 use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI_FORMAT_B8G8R8A8_UNORM};
 use windows::Win32::Graphics::Dxgi::{IDXGIDevice, IDXGISurface};
+use windows::Win32::Graphics::Gdi::{CombineRgn, CreateRectRgn, DeleteObject, SetWindowRgn, RGN_DIFF};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, LoadCursorW, RegisterClassW, SetWindowPos, ShowWindow, HWND_TOPMOST, IDC_ARROW, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WNDCLASSW, WS_EX_NOACTIVATE,
     WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
@@ -147,8 +148,9 @@ impl Surface {
             register_class();
             // NOREDIRECTIONBITMAP: the composition device owns the pixels, so Windows allocates no
             // redirection surface and the window can be genuinely transparent.
-            // NOACTIVATE keeps focus in the user's app; TRANSPARENT passes clicks through to it,
-            // since the mouse hook reads them instead of the window.
+            // NOACTIVATE keeps focus in the user's app. TRANSPARENT asks for clicks to fall through
+            // to it, but a surface that covers a whole pane has to be hollowed out to mean it: see
+            // `keep_only_the_frame`.
             let hwnd = CreateWindowExW(
                 WS_EX_NOREDIRECTIONBITMAP | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_TOPMOST,
                 CLASS,
@@ -168,6 +170,13 @@ impl Surface {
             target.SetRoot(&visual)?;
             Ok(Surface { hwnd, _target: target, visual, surface: None, size: (0, 0), visible: false })
         }
+    }
+
+    /// Like `draw`, for a surface whose paint is an outline: the middle stays clickable.
+    pub fn draw_outline(&mut self, gpu: &Gpu, rect: Rect, band: f64, paint: impl FnOnce(&ID2D1DeviceContext)) -> Result<()> {
+        self.draw(gpu, rect, paint)?;
+        self.keep_only_the_frame(band as i32);
+        Ok(())
     }
 
     /// Move the window to `rect` and draw into it. `paint` runs with the origin already at the
@@ -209,6 +218,25 @@ impl Surface {
             }
         }
         Ok(())
+    }
+
+    /// Cut the middle out of the window, leaving a frame `band` pixels wide.
+    ///
+    /// A surface that covers a whole pane would otherwise swallow every click in it: hit-testing
+    /// hands a top-level window the mouse whatever its styles say, and `WS_EX_TRANSPARENT` and an
+    /// `HTTRANSPARENT` hit test both fail to give it back. A region is not a hint: the middle stops
+    /// being part of the window, so the click lands on the app behind it.
+    /// <https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowrgn>
+    fn keep_only_the_frame(&self, band: i32) {
+        let (w, h) = (self.size.0 as i32, self.size.1 as i32);
+        unsafe {
+            let frame = CreateRectRgn(0, 0, w, h);
+            let middle = CreateRectRgn(band, band, w - band, h - band);
+            CombineRgn(Some(frame), Some(frame), Some(middle), RGN_DIFF);
+            let _ = DeleteObject(middle.into());
+            // Takes ownership of the region on success, so it must not be freed here.
+            SetWindowRgn(self.hwnd, Some(frame), true);
+        }
     }
 
     pub fn hide(&mut self) {

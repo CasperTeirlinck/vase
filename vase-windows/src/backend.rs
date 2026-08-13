@@ -11,7 +11,6 @@ use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, H
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION};
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
-use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::Shell::{
     BHID_EnumItems, IEnumShellItems, IShellItem, IVirtualDesktopManager, SHCreateItemFromParsingName, ShellExecuteW, VirtualDesktopManager, SIGDN, SIGDN_NORMALDISPLAY, SIGDN_PARENTRELATIVEPARSING,
 };
@@ -127,7 +126,9 @@ impl Backend for WindowsBackend {
 
     /// Windows only lets the process that owns the foreground hand it on, and vase is never that
     /// process: its own windows never activate, and it swallows the click that would have made it
-    /// the last input event. So it borrows the right instead.
+    /// the last input event. Zeroing the lock timeout below is what makes the handover legal.
+    /// `AttachThreadInput` would too, but sharing an input queue with the app costs it its mouse and
+    /// keyboard for as long as the queues are joined.
     /// <https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow>
     fn focus(&mut self, window: WindowId) {
         let hwnd = hwnd_of(window);
@@ -135,16 +136,6 @@ impl Backend for WindowsBackend {
             if IsIconic(hwnd).as_bool() {
                 let _ = ShowWindow(hwnd, SW_RESTORE);
             }
-            let ours = GetCurrentThreadId();
-            let outgoing = GetWindowThreadProcessId(GetForegroundWindow(), None);
-            let incoming = GetWindowThreadProcessId(hwnd, None);
-            // Both queues, not just the outgoing one: attaching to the incoming thread is what makes
-            // the trailing `SetFocus` land, and attaching to the outgoing one is what makes the swap
-            // legal at all.
-            let attach = |thread: u32, on: bool| thread != 0 && thread != ours && AttachThreadInput(ours, thread, on).as_bool();
-            let held_outgoing = attach(outgoing, true);
-            let held_incoming = incoming != outgoing && attach(incoming, true);
-
             // Left alone, the shell defers a foreground change it considers unsolicited into a
             // taskbar flash. Zero for the duration of the swap, then put the user's value back.
             // No SPIF_SENDCHANGE: that broadcasts WM_SETTINGCHANGE to every top-level window and
@@ -159,16 +150,20 @@ impl Backend for WindowsBackend {
 
             let _ = SetForegroundWindow(hwnd);
             let _ = BringWindowToTop(hwnd);
-            let _ = SetFocus(Some(hwnd));
+            // Only if that was refused: borrow the outgoing thread's input queue, which is enough to
+            // make the handover legal, and give it straight back. Never the incoming thread's, whose
+            // app would be the one left unable to take a click.
+            if GetForegroundWindow() != hwnd {
+                let ours = GetCurrentThreadId();
+                let outgoing = GetWindowThreadProcessId(GetForegroundWindow(), None);
+                if outgoing != 0 && outgoing != ours && AttachThreadInput(ours, outgoing, true).as_bool() {
+                    let _ = SetForegroundWindow(hwnd);
+                    let _ = AttachThreadInput(ours, outgoing, false);
+                }
+            }
 
             if saved {
                 let _ = SystemParametersInfoW(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, Some(lock_timeout as usize as *mut c_void), quietly);
-            }
-            if held_incoming {
-                attach(incoming, false);
-            }
-            if held_outgoing {
-                attach(outgoing, false);
             }
         }
     }
