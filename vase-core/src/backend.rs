@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::chrome::Position;
 use crate::geometry::Rect;
 use crate::tree::WindowId;
 
@@ -54,6 +55,11 @@ pub trait Backend {
     /// Display names of apps currently showing a notification badge.
     fn badged_apps(&self) -> HashSet<String> {
         HashSet::new()
+    }
+
+    /// Which edge the tab bar takes when the config names none.
+    fn default_bar_position(&self) -> Position {
+        Position::Bottom
     }
 }
 

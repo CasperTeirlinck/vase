@@ -64,7 +64,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         let mut old_by_id: HashMap<u32, Screen> = self.display_ids.iter().copied().zip(std::mem::take(&mut model.screens)).collect();
         let mut new_screens: Vec<Screen> = Vec::with_capacity(displays.len());
         for (i, display) in displays.iter().enumerate() {
-            let rect = crate::chrome::usable(display.work_area, i == main_screen);
+            let rect = crate::chrome::usable(display.work_area, i == main_screen, self.bar_position);
             let screen = match old_by_id.remove(&display.id) {
                 Some(mut s) => {
                     s.rect = rect;

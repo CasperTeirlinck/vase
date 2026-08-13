@@ -42,7 +42,10 @@ fn main() {
     let screens_cg: Vec<Rect> = displays.iter().map(|d| d.bounds).collect();
     // The main display is the one at the CG global origin (0,0).
     let main_screen = screens_cg.iter().position(|r| r.x == 0.0 && r.y == 0.0).unwrap_or(0);
-    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen)).collect();
+    // The bar's edge decides which strip the layout gives up, so it has to be known before the
+    // screens are cut. The daemon resolves it the same way for itself.
+    let bar_position = vase_macos::paths::load_config().bar_position.unwrap_or(backend.default_bar_position());
+    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen, bar_position)).collect();
 
     // Adopt every on-screen manageable window, plus the ones already minimized: scan the full window list (all Spaces) and keep only the ones AX confirms are minimized,
     // so we don't pull in other Spaces' or background windows. Minimized ones show as tabs but aren't placed until selected.

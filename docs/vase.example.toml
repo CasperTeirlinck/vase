@@ -19,8 +19,10 @@ favorites = []
 # hotkey = "#d9dee5"   # bright outline for a focus-hotkey tab
 
 # Tab-bar leading mark: "vase" (the logo, default), "" to hide it (the first tab then caps like a stack), or any glyph.
+# Position: "top" or "bottom".
 # [tabbar]
 # mark = "vase"
+# position = "top"
 
 # A global hotkey that toggles focus to an app: press the chord to bring it forward, press again to hide it.
 # Add one [[app_focus]] block per app.

@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::backend::Backend;
-use crate::chrome::{Context, Deck, Painter};
+use crate::chrome::{Context, Deck, Painter, Position};
 use crate::config::{AppFocus, Config};
 use crate::geometry::Rect;
 use crate::input::{NumberEntry, Switcher};
@@ -57,6 +57,8 @@ pub struct Daemon<B: Backend, C: Painter> {
     badge_tick: u32,
     /// Whether a window is fullscreen, so the chrome hides instead of sitting over it.
     fullscreen: bool,
+    /// Edge of the main display the tab bar sits on, and so which edge the layout gives up.
+    bar_position: Position,
     /// Managed windows currently on another workspace.
     off_workspace: HashSet<WindowId>,
     /// Polls to skip OS-focus-following after our own focus command, so the window list's lag on a just-raised window doesn't flip focus back (a flicker).
@@ -104,6 +106,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         let config = paths.config.as_deref().map(Config::load).unwrap_or_default();
         crate::chrome::theme::set_theme(config.theme);
         crate::chrome::theme::set_mark(config.mark);
+        let bar_position = config.bar_position.unwrap_or(backend.default_bar_position());
         let apps = backend.launchable_apps();
         Daemon {
             model: Some(model),
@@ -119,6 +122,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             pending_reframe: Vec::new(),
             reframe_deadline: None,
             fullscreen: false,
+            bar_position,
             off_workspace: HashSet::new(),
             focus_cooldown: 0,
             last_front: None,
@@ -183,6 +187,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             off_workspace: &self.off_workspace,
             hotkeys: &self.app_hotkeys,
             main_screen: self.main_screen,
+            bar_position: self.bar_position,
             prefix_armed: self.prefix_armed,
             prompt: self.prompt.as_ref().map(|(kind, buf)| format!("{}{buf}\u{258f}", kind.prefix())),
             picker_open: self.pane_picker.is_some(),

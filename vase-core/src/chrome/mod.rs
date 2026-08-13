@@ -9,13 +9,23 @@ pub use crate::geometry::{Rect, BAR_HEIGHT};
 pub use deck::{Context, Deck};
 pub use paint::{ListAt, Painter, SwitchRow};
 
+/// Which edge of the main display the tab bar sits on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Position {
+    Top,
+    Bottom,
+}
+
 /// The tileable area of a display: its work area, less the strip the tab bar reserves on the main one.
-pub fn usable(work_area: Rect, main: bool) -> Rect {
-    if main {
-        Rect::new(work_area.x, work_area.y, work_area.w, work_area.h - BAR_HEIGHT)
-    } else {
-        work_area
+pub fn usable(work_area: Rect, main: bool, bar: Position) -> Rect {
+    if !main {
+        return work_area;
     }
+    let top = match bar {
+        Position::Top => work_area.y + BAR_HEIGHT,
+        Position::Bottom => work_area.y,
+    };
+    Rect::new(work_area.x, top, work_area.w, work_area.h - BAR_HEIGHT)
 }
 
 pub const FONT_SIZE: f64 = 12.0;

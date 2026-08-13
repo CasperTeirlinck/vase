@@ -50,7 +50,10 @@ fn main() {
     let screens_cg: Vec<Rect> = displays.iter().map(|d| d.bounds).collect();
     // The main display is the one at the virtual-desktop origin.
     let main_screen = screens_cg.iter().position(|r| r.x == 0.0 && r.y == 0.0).unwrap_or(0);
-    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen)).collect();
+    // The bar's edge decides which strip the layout gives up, so it has to be known before the
+    // screens are cut. The daemon resolves it the same way for itself.
+    let bar_position = vase_windows::paths::load_config().bar_position.unwrap_or(backend.default_bar_position());
+    let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen, bar_position)).collect();
 
     // Minimized windows stay in the enumeration on Windows, so one pass adopts everything; they show
     // as tabs but are not placed until selected.
@@ -104,8 +107,8 @@ fn main() {
         match daemon_click.try_borrow_mut() {
             Ok(mut d) => d.click(px, py),
             // Routing needs the daemon, so a deferred click cannot say whether it lands on vase's
-            // own chrome. Passing it through is the safe half of that guess: the strip under the bar
-            // is reserved, so there is nothing behind it to disturb.
+            // own chrome. Passing it through is the safe half of that guess: swallowing a click the
+            // user aimed at an app is worse than letting one through to whatever sits behind the bar.
             Err(_) => {
                 queue_click.borrow_mut().push_back(Box::new(move |d: &mut Vase| {
                     d.click(px, py);

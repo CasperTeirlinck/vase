@@ -16,6 +16,7 @@ use crate::tree::WindowId;
 use super::bar::{self, BarLayout, BarTab};
 use super::paint::{ListAt, Painter, SwitchRow};
 use super::theme;
+use super::Position;
 
 /// A drawn bar's click map: its rect, per-tab hit ranges, and what each range selects.
 pub(crate) type ClickMap = (Rect, Vec<(f64, f64)>, Vec<WindowId>);
@@ -31,6 +32,8 @@ pub struct Context<'a> {
     pub hotkeys: &'a [AppFocus],
     /// Display the tab bar lives on.
     pub main_screen: usize,
+    /// Edge of that display the tab bar sits on.
+    pub bar_position: Position,
     pub prefix_armed: bool,
     /// Command line contents, drawn in place of the tabs while it is open.
     pub prompt: Option<String>,
@@ -91,8 +94,12 @@ impl<C: Painter> Deck<C> {
 
     fn sync_bar(&mut self, model: &Model, ctx: &Context) {
         let screen = model.screens[ctx.main_screen].rect;
-        // The bar's rect: the reserved strip below the content rect, full width.
-        let bar_rect = Rect::new(screen.x, screen.y + screen.h, screen.w, BAR_HEIGHT);
+        // The bar's rect: the reserved strip on the far side of the content rect, full width.
+        let bar_y = match ctx.bar_position {
+            Position::Top => screen.y - BAR_HEIGHT,
+            Position::Bottom => screen.y + screen.h,
+        };
+        let bar_rect = Rect::new(screen.x, bar_y, screen.w, BAR_HEIGHT);
         // While the command line is open it owns the bar; no tabs, and no click targets.
         if let Some(line) = &ctx.prompt {
             let layout = self.lay_out(bar_rect, &[], 0, ctx.prefix_armed, true);

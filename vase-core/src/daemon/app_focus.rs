@@ -1,7 +1,7 @@
 //! Global app-focus toggle hotkeys.
 
 use crate::input::Key;
-use crate::model::Command;
+use crate::model::{Command, Effect};
 use crate::registry::app_matches;
 
 use super::Daemon;
@@ -21,7 +21,29 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         self.favorites = config.favorites;
         crate::chrome::theme::set_theme(config.theme);
         crate::chrome::theme::set_mark(config.mark);
+        let position = config.bar_position.unwrap_or(self.backend.default_bar_position());
+        if position != self.bar_position {
+            self.bar_position = position;
+            // The strip the bar reserves is now on the other edge, so every screen's tileable area
+            // has to be recut and the windows moved into it.
+            self.reserve_screens();
+            if let Some(placements) = self.model.as_ref().map(|m| m.placements()) {
+                self.execute(vec![Effect::Render(placements)]);
+            }
+        }
         self.refresh(); // palette, mark, and hotkey/favorite markers may have changed
+    }
+
+    /// Recut each screen's tileable area from its display, for a bar that has changed edge.
+    fn reserve_screens(&mut self) {
+        let displays = self.backend.displays();
+        let (main, position) = (self.main_screen, self.bar_position);
+        let Some(model) = self.model.as_mut() else { return };
+        for (i, display) in displays.iter().enumerate() {
+            if let Some(screen) = model.screens.get_mut(i) {
+                screen.rect = crate::chrome::usable(display.work_area, i == main, position);
+            }
+        }
     }
 
     /// Toggle focus to `app`: if already on it, jump back to the previous window, else focus its first.

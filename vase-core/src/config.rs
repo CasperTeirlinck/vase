@@ -3,6 +3,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::chrome::theme::{by_name, parse_hex, Mark, Theme, ONE_DARK};
+use crate::chrome::Position;
 use crate::input::{Key, KeyCode, Mods};
 
 pub const DEFAULT: &str = include_str!("../../docs/vase.example.toml");
@@ -18,11 +19,13 @@ pub struct Config {
     pub favorites: Vec<String>,
     pub theme: Theme,
     pub mark: Mark,
+    /// `None` leaves the edge to the platform, whose OS furniture decides which one is free.
+    pub bar_position: Option<Position>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: ONE_DARK, mark: Mark::Logo }
+        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: ONE_DARK, mark: Mark::Logo, bar_position: None }
     }
 }
 
@@ -43,7 +46,8 @@ impl Config {
             }
         };
         let RawConfig { app_focus, favorites, theme, tabbar } = raw;
-        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark: tabbar.resolve() }
+        let (mark, bar_position) = tabbar.resolve();
+        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position }
     }
 
     pub fn ensure(path: &Path) {
@@ -145,15 +149,26 @@ impl RawTheme {
 #[derive(Deserialize, Default)]
 struct RawTabbar {
     mark: Option<String>,
+    position: Option<String>,
 }
 
 impl RawTabbar {
-    fn resolve(self) -> Mark {
-        match self.mark.as_deref() {
+    fn resolve(self) -> (Mark, Option<Position>) {
+        let mark = match self.mark.as_deref() {
             None | Some("vase") => Mark::Logo,
             Some("") => Mark::Hidden,
             Some(glyph) => Mark::Glyph(glyph.to_string()),
-        }
+        };
+        let position = match self.position.as_deref() {
+            None => None,
+            Some("top") => Some(Position::Top),
+            Some("bottom") => Some(Position::Bottom),
+            Some(other) => {
+                eprintln!("vase: config: unrecognized tabbar position {other:?}; leaving it to the platform");
+                None
+            }
+        };
+        (mark, position)
     }
 }
 

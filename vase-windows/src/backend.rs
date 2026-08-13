@@ -16,12 +16,14 @@ use windows::Win32::UI::Shell::{
     BHID_EnumItems, IEnumShellItems, IShellItem, IVirtualDesktopManager, SHCreateItemFromParsingName, ShellExecuteW, VirtualDesktopManager, SIGDN, SIGDN_NORMALDISPLAY, SIGDN_PARENTRELATIVEPARSING,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindow, GetWindowPlacement, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
-    IsZoomed, PostMessageW, SetForegroundWindow, SetWindowPos, ShowWindow, SystemParametersInfoW, GW_OWNER, HWND_TOP, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_NOACTIVATE,
-    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_MINIMIZE, SW_RESTORE, SW_SHOW, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOWPLACEMENT, WM_CLOSE, WS_CAPTION, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    BringWindowToTop, EnumWindows, GetForegroundWindow, GetShellWindow, GetWindow, GetWindowPlacement, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+    IsWindowVisible, IsZoomed, PostMessageW, SetForegroundWindow, SetWindowPos, ShowWindow, SystemParametersInfoW, GW_OWNER, HWND_TOP, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_MINIMIZE, SW_RESTORE, SW_SHOW, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOWPLACEMENT, WM_CLOSE, WS_CAPTION, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW,
 };
 
 use vase_core::backend::{Backend, Display, WindowInfo};
+use vase_core::chrome::Position;
 use vase_core::geometry::Rect;
 use vase_core::tree::WindowId;
 
@@ -225,12 +227,23 @@ impl Backend for WindowsBackend {
         if style(hwnd) & WS_CAPTION.0 != 0 {
             return Some(false);
         }
+        // The desktop covers its monitor and has no title bar either, and it takes the foreground
+        // whenever a click lands on it. Reading that as fullscreen would hide the chrome, including
+        // the bar the click was aimed at.
+        if belongs_to_the_shell(hwnd) {
+            return Some(false);
+        }
         let frame = window_rect(hwnd)?;
         Some(self.displays().iter().any(|d| frame.x <= d.bounds.x && frame.y <= d.bounds.y && frame.w >= d.bounds.w && frame.h >= d.bounds.h))
     }
 
     fn close(&mut self, window: WindowId) {
         let _ = unsafe { PostMessageW(Some(hwnd_of(window)), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+    }
+
+    /// The taskbar owns the bottom edge of the screen, so the bar takes the top.
+    fn default_bar_position(&self) -> Position {
+        Position::Top
     }
 
     fn launchable_apps(&self) -> Vec<String> {
@@ -380,6 +393,21 @@ fn restored_frame(hwnd: HWND) -> Option<Rect> {
     let mut placement = WINDOWPLACEMENT { length: std::mem::size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
     unsafe { GetWindowPlacement(hwnd, &mut placement) }.ok()?;
     Some(rect_of(placement.rcNormalPosition))
+}
+
+/// Whether the window belongs to the process that draws the desktop.
+fn belongs_to_the_shell(hwnd: HWND) -> bool {
+    let shell = unsafe { GetShellWindow() };
+    if shell.is_invalid() {
+        return false;
+    }
+    let pid_of = |w| {
+        let mut pid = 0u32;
+        let _ = unsafe { GetWindowThreadProcessId(w, Some(&mut pid)) };
+        pid
+    };
+    let pid = pid_of(hwnd);
+    pid != 0 && pid == pid_of(shell)
 }
 
 /// Composited but not shown: suspended UWP apps, and windows on another virtual desktop.
