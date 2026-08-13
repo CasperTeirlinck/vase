@@ -5,7 +5,7 @@ use std::time::Instant;
 use crate::input::{Key, Pick};
 use crate::model::Command;
 use crate::registry::clean_title;
-use crate::tree::{windows, WindowId};
+use crate::tree::WindowId;
 
 use super::SwitchTarget;
 use crate::backend::Backend;
@@ -25,31 +25,13 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         }
     }
 
-    /// A window's display name: nested-stack custom name, else tab name (top-level only), else title, else app.
-    pub(crate) fn window_display(&self, id: WindowId, in_stack: bool) -> String {
+    /// A window's display name: its custom per-window name, else title, else app.
+    pub(crate) fn window_display(&self, id: WindowId) -> String {
         let model = self.model.as_ref().unwrap();
-        if let Some(n) = model.stack_names.get(&id).filter(|n| !n.trim().is_empty()) {
+        if let Some(n) = model.names.get(&id).filter(|n| !n.trim().is_empty()) {
             return n.clone();
         }
-        if !in_stack {
-            if let Some(n) = self.window_tab_name(id).filter(|n| !n.trim().is_empty()) {
-                return n;
-            }
-        }
         self.title_of(id)
-    }
-
-    /// The custom name of the tab holding this window, if it has one.
-    fn window_tab_name(&self, id: WindowId) -> Option<String> {
-        let model = self.model.as_ref()?;
-        for s in &model.screens {
-            for t in &s.tabs {
-                if windows(&t.root).contains(&id) {
-                    return t.name.clone();
-                }
-            }
-        }
-        None
     }
 
     /// "App - window title", or just the app if the title is empty.

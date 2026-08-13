@@ -100,10 +100,10 @@ fn a_saved_layout_adapts_to_a_different_screen_count() {
 }
 
 #[test]
-fn stack_names_follow_their_window_through_a_rematch() {
+fn names_follow_their_window_through_a_rematch() {
     let mut m = Model::adopt(&[rect()], &[(WindowId(1), 0)]);
-    m.stack_names.insert(WindowId(1), "editor".into());
+    m.names.insert(WindowId(1), "editor".into());
     let ids = vec![ident(1, "Ghostty", "~")];
     let m = restore(Some((m, ids)), &[live(90, "Ghostty", "~")], &[rect()]);
-    assert_eq!(m.stack_names.get(&WindowId(90)).map(String::as_str), Some("editor"));
+    assert_eq!(m.names.get(&WindowId(90)).map(String::as_str), Some("editor"));
 }

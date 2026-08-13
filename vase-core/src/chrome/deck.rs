@@ -150,8 +150,8 @@ impl<C: Painter> Deck<C> {
                     .enumerate()
                     .map(|(i, id)| {
                         let app = ctx.windows.app(*id).to_string();
-                        // A custom nested-tab name overrides the window title.
-                        let label = match model.stack_names.get(id) {
+                        // A custom name overrides the window title.
+                        let label = match model.names.get(id) {
                             Some(name) => name.clone(),
                             None => {
                                 let ct = clean_title(ctx.windows.title(*id), &app);

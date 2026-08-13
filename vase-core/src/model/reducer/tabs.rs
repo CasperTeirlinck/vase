@@ -1,6 +1,6 @@
 use super::render_and_focus;
 use crate::model::{Effect, Model, Tab};
-use crate::tree::{Node, Pane};
+use crate::tree::{windows, Node, Pane};
 
 pub(super) fn new_tab(mut model: Model) -> (Model, Vec<Effect>) {
     let id = model.next_id();
@@ -98,9 +98,22 @@ pub(super) fn move_tab_to_screen(mut model: Model, dir: isize) -> (Model, Vec<Ef
 }
 
 pub(super) fn set_tab_name(mut model: Model, name: Option<String>) -> (Model, Vec<Effect>) {
-    if let Some(tab) = model.focused_tab_mut() {
-        // Empty clears the override; a whitespace-only name is kept (bar renders icon-only).
-        tab.name = name.filter(|s| !s.is_empty());
+    // Empty clears the override; a whitespace-only name is kept.
+    let name = name.filter(|s| !s.is_empty());
+    let Some(tab) = model.focused_tab() else {
+        return (model, vec![]);
+    };
+    let ws = windows(&tab.root);
+    if ws.len() == 1 {
+        // Naming a single-window tab names the window, so the name follows it across splits, moves, and stacks.
+        let w = ws[0];
+        model.focused_tab_mut().unwrap().name = None; // drop any stale group name; the per-window name wins
+        match name {
+            Some(n) => drop(model.names.insert(w, n)),
+            None => drop(model.names.remove(&w)),
+        }
+    } else {
+        model.focused_tab_mut().unwrap().name = name;
     }
     (model, vec![])
 }

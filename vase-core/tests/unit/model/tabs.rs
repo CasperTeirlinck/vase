@@ -60,3 +60,20 @@ fn set_tab_name_sets_and_clears_the_current_tab_name() {
     let (m, _) = apply(m, Command::SetTabName(None));
     assert_eq!(m.bar_tabs().0[0].2, None);
 }
+
+#[test]
+fn a_named_window_keeps_its_name_across_a_move_into_a_split_and_back() {
+    // Name win 2's tab, then move win 2 into another tab's split and break it back out.
+    let (m, _) = apply(three(), Command::SelectTab(1));
+    let (m, _) = apply(m, Command::SetTabName(Some("bar".into())));
+    assert_eq!(m.names.get(&win(2)), Some(&"bar".to_string()));
+    let (m, _) = apply(m, Command::SelectTab(0));
+    let (m, _) = apply(m, Command::Split(Dir::Horizontal));
+    let (m, _) = apply(m, Command::FillPane(win(2))); // win 2's own tab is destroyed here
+                                                      // The name survives the move: it is keyed by the window, not the destroyed tab.
+    assert_eq!(m.names.get(&win(2)), Some(&"bar".to_string()));
+    let (m, _) = apply(m, Command::BreakPane);
+    let (tabs, _) = m.bar_tabs();
+    let win2_tab = tabs.iter().find(|(ws, _, _)| ws == &vec![win(2)]).expect("win 2 has its own tab again");
+    assert_eq!(win2_tab.2.as_deref(), Some("bar"));
+}

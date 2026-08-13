@@ -39,7 +39,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     pub fn start_stack_rename(&mut self) {
         let model = self.model.as_ref().unwrap();
         let Some(wid) = model.focused_stack_window() else { return };
-        let seed = model.stack_names.get(&wid).cloned().unwrap_or_default();
+        let seed = model.names.get(&wid).cloned().unwrap_or_default();
         self.prompt = Some((PromptKind::StackRename, seed));
         self.refresh();
     }

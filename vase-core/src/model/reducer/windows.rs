@@ -14,7 +14,7 @@ pub(super) fn add_window(mut model: Model, id: WindowId, si: usize) -> (Model, V
 }
 
 pub(super) fn remove_window(mut model: Model, id: WindowId) -> (Model, Vec<Effect>) {
-    model.stack_names.remove(&id);
+    model.names.remove(&id);
     let Some((si, ti, _)) = locate_window(&model, id) else {
         return (model, vec![]);
     };

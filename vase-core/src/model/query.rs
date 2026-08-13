@@ -86,7 +86,10 @@ impl Model {
                 flat_current = offset + screen.current;
             }
             for t in &screen.tabs {
-                tabs.push((windows(&t.root), tab_label_window(t), t.name.clone()));
+                let ws = windows(&t.root);
+                // A single-window tab's name lives with the window; a multi-window tab carries a group name on the tab.
+                let name = if ws.len() == 1 { self.names.get(&ws[0]).cloned().or_else(|| t.name.clone()) } else { t.name.clone() };
+                tabs.push((ws, tab_label_window(t), name));
             }
             offset += screen.tabs.len();
         }
