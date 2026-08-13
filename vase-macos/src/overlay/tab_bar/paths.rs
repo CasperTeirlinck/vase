@@ -11,7 +11,7 @@ use vase_core::geometry::Rect;
 
 use super::super::text::segment;
 use super::super::theme::*;
-use super::super::{BAR_HEIGHT, FONT_SIZE};
+use super::super::BAR_HEIGHT;
 use super::TabBar;
 
 /// `begin`'s handles: `(container, content_view, content_layer, glyph_label)`.

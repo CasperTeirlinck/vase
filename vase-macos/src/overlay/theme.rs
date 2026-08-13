@@ -4,7 +4,7 @@ use objc2::rc::Retained;
 use objc2_app_kit::NSColor;
 use vase_core::chrome::theme::{theme, Role};
 
-pub(crate) use vase_core::chrome::theme::{mark, Mark, PANE_PAD, PANE_RADIUS};
+pub(crate) use vase_core::chrome::theme::{PANE_PAD, PANE_RADIUS};
 
 /// Resolve a palette role to an `NSColor`, for laid-out chrome that names colors by role.
 pub(crate) fn role(r: Role) -> Retained<NSColor> {
@@ -21,9 +21,6 @@ pub(crate) fn strip_bg() -> Retained<NSColor> {
 }
 pub(crate) fn active_bg() -> Retained<NSColor> {
     color(Role::Active)
-}
-pub(crate) fn dim_bg() -> Retained<NSColor> {
-    color(Role::DimBg)
 }
 pub(crate) fn text_col() -> Retained<NSColor> {
     color(Role::Text)

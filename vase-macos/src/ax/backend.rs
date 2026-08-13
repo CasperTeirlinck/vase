@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use accessibility_sys::{
-    kAXFrontmostAttribute, kAXPositionAttribute, kAXRaiseAction, kAXSizeAttribute, kAXValueTypeCGPoint, kAXValueTypeCGSize, AXUIElementCopyAttributeValue, AXUIElementCreateApplication,
-    AXUIElementPerformAction, AXUIElementRef, AXUIElementSetAttributeValue, AXValueCreate,
+    kAXErrorSuccess, kAXFrontmostAttribute, kAXPositionAttribute, kAXRaiseAction, kAXSizeAttribute, kAXValueTypeCGPoint, kAXValueTypeCGSize, AXUIElementCopyAttributeValue,
+    AXUIElementCreateApplication, AXUIElementPerformAction, AXUIElementRef, AXUIElementSetAttributeValue, AXValueCreate,
 };
 use core_foundation::base::{CFRelease, CFTypeRef, TCFType};
 use core_foundation::boolean::CFBoolean;
