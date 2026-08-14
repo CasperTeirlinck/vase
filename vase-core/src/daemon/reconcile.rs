@@ -1,4 +1,4 @@
-//! Live-window/display reconciliation: the 100 ms poll that adopts, drops, and re-tiles windows and follows OS focus.
+//! Live-window/display reconciliation: a poll that adopts, drops, and re-tiles windows and follows OS focus.
 
 use std::collections::{HashMap, HashSet};
 
@@ -162,21 +162,21 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             self.refresh();
         }
 
-        // On a quiet poll, follow the real OS focus (frontmost = first z-ordered entry) so a click elsewhere updates our model. Two guards for multi-monitor separate Spaces:
-        //  - edge-triggered: sync only when the frontmost actually CHANGES;
-        //  - same-screen only: the active Space always reports its own key window as global-front, so a "frontmost" window on another monitor is an artifact, not a user action;
-        //    chasing it would bounce focus off the monitor we just moved to.
-        // Skip during the post-command cooldown.
+        // On a quiet poll, follow the real OS focus (frontmost = first z-ordered entry) so a click, on any
+        // monitor, updates our model. Edge-triggered: sync only when the frontmost actually CHANGES. Right after
+        // vase moves focus to another monitor, the monitor we left can re-report its key window as global-front;
+        // tracking `last_front` through the post-command cooldown makes that persistent reassertion look unchanged,
+        // so following focus across monitors never bounces back.
         if !changed {
             if self.focus_cooldown > 0 {
                 self.focus_cooldown -= 1;
+                self.last_front = current.first().map(|w| w.id);
             } else if let Some(front) = current.first() {
                 let front_changed = self.last_front != Some(front.id);
                 self.last_front = Some(front.id);
-                let front_screen = screen_of(front.frame, &self.screens_cg);
                 let model = self.model.as_ref().unwrap();
                 // Skip while the focused pane is empty (focused_window() is None).
-                if front_changed && model.focused_window().is_some_and(|f| f != front.id) && front_screen == model.focused_screen {
+                if front_changed && model.focused_window().is_some_and(|f| f != front.id) {
                     self.dispatch(Command::SyncFocus(front.id));
                 }
             }
