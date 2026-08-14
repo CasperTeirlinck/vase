@@ -52,6 +52,9 @@ pub trait Backend {
     /// Spawn a new instance of `app`.
     fn launch(&self, app: &str);
 
+    /// Move the mouse cursor to a point in global display coordinates.
+    fn warp_cursor(&self, x: f64, y: f64);
+
     /// Display names of apps currently showing a notification badge.
     fn badged_apps(&self) -> HashSet<String> {
         HashSet::new()

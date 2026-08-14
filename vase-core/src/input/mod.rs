@@ -111,6 +111,8 @@ pub enum InputCommand {
     StackRename,
     /// Open the `:` command line (tmux prefix-:).
     CommandLine,
+    /// Move the mouse cursor to the center of the focused pane (prefix-m).
+    WarpCursor,
     Quit,
 }
 

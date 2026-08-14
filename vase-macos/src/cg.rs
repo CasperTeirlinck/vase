@@ -3,10 +3,26 @@ use core_foundation::dictionary::CFDictionary;
 use core_foundation::number::CFNumber;
 use core_foundation::string::CFString;
 use core_graphics::display::CGDisplay;
+use core_graphics::geometry::CGPoint;
 use core_graphics::window::{copy_window_info, kCGNullWindowID, kCGWindowListExcludeDesktopElements, kCGWindowListOptionOnScreenOnly};
 use vase_core::backend::WindowInfo;
 use vase_core::geometry::Rect;
 use vase_core::tree::WindowId;
+
+// CoreGraphics cursor control, not surfaced by the core-graphics crate. `boolean_t` is a C int.
+extern "C" {
+    fn CGWarpMouseCursorPosition(new_cursor_position: CGPoint) -> i32;
+    fn CGAssociateMouseAndMouseCursorPosition(connected: i32) -> i32;
+}
+
+/// Move the mouse cursor to a global display point (top-left origin).
+pub fn warp_cursor(x: f64, y: f64) {
+    unsafe {
+        CGWarpMouseCursorPosition(CGPoint::new(x, y));
+        // Warping otherwise suppresses hardware mouse movement for ~250 ms; re-associate to keep it live.
+        CGAssociateMouseAndMouseCursorPosition(1);
+    }
+}
 
 /// Visible display rects in global coordinates.
 pub fn screens() -> Vec<Rect> {

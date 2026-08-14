@@ -257,6 +257,10 @@ impl Backend for WindowsBackend {
         // No verb: a shell path carries its own default action, and a packaged app has no "open".
         let _ = unsafe { ShellExecuteW(None, None, PCWSTR(target.as_ptr()), None, None, SW_SHOW) };
     }
+
+    fn warp_cursor(&self, x: f64, y: f64) {
+        let _ = unsafe { windows::Win32::UI::WindowsAndMessaging::SetCursorPos(x as i32, y as i32) };
+    }
 }
 
 /// Every app the shell can launch, as `(display name, shell path)`.

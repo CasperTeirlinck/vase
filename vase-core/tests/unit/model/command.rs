@@ -7,7 +7,7 @@ use crate::tree::Dir;
 /// `InputCommand` breaks this match, so the new binding has to be classified here too.
 fn drives_the_daemon(cmd: &I) -> bool {
     match cmd {
-        I::LastTab | I::Quit | I::SendPrefix | I::WindowSwitcher | I::Rename | I::StackRename | I::CommandLine | I::SelectBarTab(_) => true,
+        I::LastTab | I::Quit | I::SendPrefix | I::WindowSwitcher | I::Rename | I::StackRename | I::CommandLine | I::WarpCursor | I::SelectBarTab(_) => true,
         I::NewTab
         | I::StackNext
         | I::StackPrev
@@ -49,6 +49,7 @@ fn all() -> Vec<I> {
         I::Rename,
         I::StackRename,
         I::CommandLine,
+        I::WarpCursor,
         I::SelectBarTab(3),
         I::NewTab,
         I::StackNext,

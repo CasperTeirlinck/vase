@@ -73,10 +73,18 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             I::Rename => self.start_rename(),
             I::StackRename => self.start_stack_rename(),
             I::CommandLine => self.start_command(),
+            I::WarpCursor => self.warp_cursor_to_focus(),
             I::SelectBarTab(n) => self.begin_tab_entry(n),
             I::SendPrefix => {}
             // Everything else is a model edit `from_input` already returned.
             _ => {}
+        }
+    }
+
+    /// Move the mouse cursor to the center of the focused pane.
+    fn warp_cursor_to_focus(&self) {
+        if let Some(r) = self.model.as_ref().and_then(|m| m.focused_pane_rect()) {
+            self.backend.warp_cursor(r.x + r.w / 2.0, r.y + r.h / 2.0);
         }
     }
 

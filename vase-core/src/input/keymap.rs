@@ -27,6 +27,7 @@ pub(crate) fn bindings() -> HashMap<Key, InputCommand> {
         ('[', I::StackFocusPrev),
         (']', I::StackFocusNext),
         ('t', I::Rename),
+        ('m', I::WarpCursor),
     ] {
         b.insert(Key::ch(c), cmd);
     }

@@ -185,6 +185,10 @@ impl Backend for MacBackend {
         }
     }
 
+    fn warp_cursor(&self, x: f64, y: f64) {
+        crate::cg::warp_cursor(x, y);
+    }
+
     fn badged_apps(&self) -> HashSet<String> {
         crate::dock::badged_apps()
     }
