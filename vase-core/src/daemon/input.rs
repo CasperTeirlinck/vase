@@ -74,6 +74,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             I::StackRename => self.start_stack_rename(),
             I::CommandLine => self.start_command(),
             I::WarpCursor => self.warp_cursor_to_focus(),
+            I::Resync => self.resync(),
             I::SelectBarTab(n) => self.begin_tab_entry(n),
             I::SendPrefix => {}
             // Everything else is a model edit `from_input` already returned.

@@ -29,6 +29,12 @@ define_class!(
             crate::request_reload_config();
         }
 
+        // Re-place every window onto its layout, recovering from a manual move or a monitor hotplug.
+        #[unsafe(method(resync:))]
+        fn resync(&self, _sender: Option<&AnyObject>) {
+            crate::request_resync();
+        }
+
         // Open the config file in the user's default text editor.
         #[unsafe(method(openSettings:))]
         fn open_settings(&self, _sender: Option<&AnyObject>) {
@@ -109,6 +115,7 @@ pub fn install(mtm: MainThreadMarker) -> Retained<NSStatusItem> {
     add("About vase", sel!(about:), "");
     menu.addItem(&NSMenuItem::separatorItem(mtm));
     add("New tab", sel!(newTab:), "");
+    add("Resync windows", sel!(resync:), "");
     add("Reload config", sel!(reloadConfig:), "");
     menu.addItem(&NSMenuItem::separatorItem(mtm));
     add("Settings…", sel!(openSettings:), ",");

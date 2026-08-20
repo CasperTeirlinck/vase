@@ -94,7 +94,7 @@ impl Command {
             I::StackSelectItem(n) => Command::StackSelect(*n),
             I::StackMovePrev => Command::StackMove(-1),
             I::StackMoveNext => Command::StackMove(1),
-            I::LastTab | I::Quit | I::SendPrefix | I::WindowSwitcher | I::Rename | I::StackRename | I::CommandLine | I::WarpCursor | I::SelectBarTab(_) => return None,
+            I::LastTab | I::Quit | I::SendPrefix | I::WindowSwitcher | I::Rename | I::StackRename | I::CommandLine | I::WarpCursor | I::Resync | I::SelectBarTab(_) => return None,
         })
     }
 }

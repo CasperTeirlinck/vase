@@ -113,6 +113,8 @@ pub enum InputCommand {
     CommandLine,
     /// Move the mouse cursor to the center of the focused pane (prefix-m).
     WarpCursor,
+    /// Re-adopt windows and force every managed window back onto its layout rect (prefix Ctrl-R).
+    Resync,
     Quit,
 }
 

@@ -30,6 +30,12 @@ fn bare_arrows_focus_and_shift_arrows_resize() {
 }
 
 #[test]
+fn prefix_ctrl_r_resyncs() {
+    let ctrl = Mods { ctrl: true, ..Mods::default() };
+    assert_eq!(armed().key(Key { code: KeyCode::Char('r'), mods: ctrl }), Decision::ConsumeAndRun(InputCommand::Resync));
+}
+
+#[test]
 fn digits_select_a_tab_under_the_main_prefix() {
     assert_eq!(armed().key(Key::ch('2')), Decision::ConsumeAndRun(InputCommand::SelectBarTab(2)));
 }

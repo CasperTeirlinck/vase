@@ -98,6 +98,22 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         self.save_state();
     }
 
+    /// Re-adopt live windows, then force every managed window back onto its layout rect. Recovers from a manual
+    /// move or a monitor hotplug that left windows out of sync with the model (menu action / prefix Ctrl-R).
+    pub fn resync(&mut self) {
+        self.reconcile();
+        // The quiet poll leaves an already-placed window where it is; force a full re-place and raise instead.
+        self.last_shown.clear();
+        let placements = self.model.as_ref().unwrap().placements();
+        let mut effects = vec![Effect::Render(placements)];
+        if let Some(w) = self.model.as_ref().unwrap().focused_window() {
+            effects.push(Effect::FocusWindow(w));
+        }
+        self.refresh();
+        self.execute(effects);
+        self.save_state();
+    }
+
     /// Diff live manageable windows against the model: adopt new, remove closed.
     pub fn reconcile(&mut self) {
         self.reconcile_screens();

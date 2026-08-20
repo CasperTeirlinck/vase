@@ -36,6 +36,11 @@ pub(crate) fn bindings() -> HashMap<Key, InputCommand> {
     }
     // prefix-: (":" is Shift-semicolon on a US layout).
     b.insert(Key { code: KeyCode::Char(';'), mods: shift }, I::CommandLine);
+    // prefix-Ctrl-r re-places every window onto its layout (recover from a manual move or a monitor hotplug).
+    // Bind meta/ctrl/alt, like the move-pane keys, since per-device modifier swaps land Ctrl differently per keyboard.
+    for mods in [Mods { meta: true, ..Mods::default() }, Mods { ctrl: true, ..Mods::default() }, Mods { alt: true, ..Mods::default() }] {
+        b.insert(Key { code: KeyCode::Char('r'), mods }, I::Resync);
+    }
     // Shift-HJKL resizes too, for vim hands.
     for (code, cmd) in [
         (KeyCode::Left, I::ResizeLeft),
