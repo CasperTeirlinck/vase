@@ -20,6 +20,32 @@ fn moving_up_from_the_top_wraps_to_the_bottom() {
 }
 
 #[test]
+fn w_and_s_move_like_k_and_j() {
+    let mut s = sw();
+    ch(&mut s, 's');
+    assert_eq!(s.selected(), 1);
+    ch(&mut s, 'w');
+    assert_eq!(s.selected(), 0);
+}
+
+#[test]
+fn space_chooses_the_highlighted_row() {
+    let mut s = sw();
+    ch(&mut s, 's');
+    assert_eq!(ch(&mut s, ' '), Pick::Chosen(Row::Win(2)));
+}
+
+#[test]
+fn w_s_and_space_type_in_search_mode() {
+    let mut s = sw();
+    ch(&mut s, '/');
+    ch(&mut s, 'w');
+    ch(&mut s, ' ');
+    ch(&mut s, 's');
+    assert_eq!(s.query(), "w s");
+}
+
+#[test]
 fn arrows_move_like_j_and_k() {
     let mut s = sw();
     press(&mut s, KeyCode::Down);

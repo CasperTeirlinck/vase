@@ -110,9 +110,11 @@ impl<T: Item> Switcher<T> {
             self.clamp();
             self.settle(1);
         } else if key.mods == Mods::default() {
+            // w/s mirror k/j and space opens, so the list is fully one-handed; all still type in search mode.
             match key.code.char() {
-                Some('j') => self.step(1),
-                Some('k') => self.step(-1),
+                Some('j') | Some('s') => self.step(1),
+                Some('k') | Some('w') => self.step(-1),
+                Some(' ') => return self.take_selected(),
                 Some('/') => {
                     self.searching = true;
                     self.query.clear();
