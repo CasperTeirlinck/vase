@@ -34,6 +34,8 @@ pub struct Context<'a> {
     pub main_screen: usize,
     /// Edge of that display the tab bar sits on.
     pub bar_position: Position,
+    /// Outline the focused pane of a split tab.
+    pub focus_border: bool,
     pub prefix_armed: bool,
     /// Command line contents, drawn in place of the tabs while it is open.
     pub prompt: Option<String>,
@@ -58,7 +60,7 @@ impl<C: Painter> Deck<C> {
         self.sync_bar(model, ctx);
         self.sync_stack_bars(model, ctx);
         self.sync_panes(model, ctx);
-        self.sync_focus_border(model);
+        self.sync_focus_border(model, ctx);
     }
 
     /// The command a click resolves to, against the click maps left by the last `sync`.
@@ -189,8 +191,8 @@ impl<C: Painter> Deck<C> {
     }
 
     /// Outline the focused pane when the tab is split and the pane holds a window.
-    fn sync_focus_border(&mut self, model: &Model) {
-        let split = model.current_pane_count() > 1 && model.focused_window().is_some();
+    fn sync_focus_border(&mut self, model: &Model, ctx: &Context) {
+        let split = ctx.focus_border && model.current_pane_count() > 1 && model.focused_window().is_some();
         self.painter.focus_border(split.then(|| model.focused_pane_rect()).flatten());
     }
 }

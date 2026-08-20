@@ -19,6 +19,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         let config = self.paths.config.as_deref().map(crate::config::Config::load).unwrap_or_default();
         self.app_hotkeys = config.app_focus;
         self.favorites = config.favorites;
+        self.focus_border = config.focus_border;
         crate::chrome::theme::set_theme(config.theme);
         crate::chrome::theme::set_mark(config.mark);
         let position = config.bar_position.unwrap_or(self.backend.default_bar_position());

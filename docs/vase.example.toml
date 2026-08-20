@@ -4,6 +4,9 @@
 # Favorite apps, shown first in the app picker. Toggle one from the picker with "f"; vase keeps this list updated.
 favorites = []
 
+# Outline the focused pane with an accent border when a tab is split. Off by default.
+focus_border = false
+
 # Color theme. Pick a built-in palette with `name` and/or override individual colors.
 # Built-in names: one-dark (default), nord, gruvbox, tokyo-night, catppuccin, fluent-dark, fluent-light.
 # [theme]

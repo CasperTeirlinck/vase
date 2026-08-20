@@ -21,11 +21,13 @@ pub struct Config {
     pub mark: Mark,
     /// `None` leaves the edge to the platform, whose OS furniture decides which one is free.
     pub bar_position: Option<Position>,
+    /// Draw the accent outline around the focused pane of a split tab; off by default.
+    pub focus_border: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: ONE_DARK, mark: Mark::Logo, bar_position: None }
+        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: ONE_DARK, mark: Mark::Logo, bar_position: None, focus_border: false }
     }
 }
 
@@ -45,9 +47,9 @@ impl Config {
                 return Config::default();
             }
         };
-        let RawConfig { app_focus, favorites, theme, tabbar } = raw;
+        let RawConfig { app_focus, favorites, theme, tabbar, focus_border } = raw;
         let (mark, bar_position) = tabbar.resolve();
-        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position }
+        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position, focus_border }
     }
 
     pub fn ensure(path: &Path) {
@@ -86,6 +88,8 @@ struct RawConfig {
     theme: RawTheme,
     #[serde(default)]
     tabbar: RawTabbar,
+    #[serde(default)]
+    focus_border: bool,
 }
 
 /// Resolve each configured chord, dropping (with a warning) the ones that name no key.
