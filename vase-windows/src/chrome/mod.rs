@@ -20,7 +20,8 @@ use icons::Icons;
 /// Row height in a list.
 const ROW_H: f64 = 28.0;
 const LIST_WIDTH: f64 = 640.0;
-const LIST_MAX_ROWS: usize = 12;
+// Cap the centered list at this fraction of the screen height before it starts scrolling.
+const LIST_MAX_SCREEN_FRAC: f64 = 0.85;
 
 pub struct D2DPainter {
     gpu: Gpu,
@@ -211,7 +212,9 @@ impl Painter for D2DPainter {
         self.icons.collect(&self.gpu);
         let (area, visible, border_role, border_w) = match at {
             ListAt::Centered(screen) => {
-                let shown = rows.len().min(LIST_MAX_ROWS);
+                // Cap by screen height (less the header row), not a fixed count, so a taller screen shows more.
+                let fit = ((screen.h * LIST_MAX_SCREEN_FRAC - 2.0 * PANE_PAD) / ROW_H) as usize;
+                let shown = rows.len().min(fit.saturating_sub(1).max(1));
                 let h = (shown + 1) as f64 * ROW_H + 2.0 * PANE_PAD;
                 (Rect::new(screen.x + (screen.w - LIST_WIDTH) / 2.0, screen.y + (screen.h - h) / 2.0, LIST_WIDTH, h), shown, Role::Border, 1.0)
             }

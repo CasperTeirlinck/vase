@@ -14,7 +14,8 @@ use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
 
 const SWITCHER_ROW_H: f64 = 28.0;
 const SWITCHER_WIDTH: f64 = 640.0;
-const SWITCHER_MAX_ITEMS: usize = 12;
+// Cap the card at this fraction of the screen height before it starts scrolling.
+const SWITCHER_MAX_SCREEN_FRAC: f64 = 0.85;
 
 /// Where a list is framed and how its card is trimmed. The two framings differ only in these values; everything below the card is drawn the same way.
 struct Frame {
@@ -44,8 +45,10 @@ impl SwitcherView {
 
     /// Render centered on `screen` as a themed rounded card, `selected` highlighted.
     pub fn show(&mut self, screen: Rect, header: &str, items: &[SwitchRow], selected: usize) {
-        // Cap visible rows so a long list can't grow off-screen; the draw scrolls to keep the selection in view.
-        let rows = items.len().min(SWITCHER_MAX_ITEMS);
+        // Cap visible rows by screen height (less the header row), not a fixed count, so a taller screen shows more
+        // before scrolling; the draw scrolls to keep the selection in view.
+        let fit = ((screen.h * SWITCHER_MAX_SCREEN_FRAC - 2.0 * PANE_PAD) / SWITCHER_ROW_H) as usize;
+        let rows = items.len().min(fit.saturating_sub(1).max(1));
         let h = (rows + 1) as f64 * SWITCHER_ROW_H + 2.0 * PANE_PAD;
         let rect = Rect::new(screen.x + (screen.w - SWITCHER_WIDTH) / 2.0, screen.y + (screen.h - h) / 2.0, SWITCHER_WIDTH, h);
         self.draw(
