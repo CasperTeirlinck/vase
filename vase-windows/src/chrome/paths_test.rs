@@ -2,7 +2,7 @@ use super::*;
 use windows::Win32::Graphics::Direct2D::{D2D1CreateFactory, D2D1_FACTORY_TYPE_SINGLE_THREADED};
 
 /// The strip's own proportions: the radius is a full semicircle, so every end runs the full height.
-const H: f64 = vase_core::chrome::BAR_HEIGHT;
+const H: f64 = vase_core::chrome::theme::Style::Powerline.bar_height();
 const R: f64 = H / 2.0;
 const CY: f64 = H / 2.0;
 const X0: f64 = 100.0;

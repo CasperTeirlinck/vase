@@ -50,9 +50,12 @@ fn main() {
     let screens_cg: Vec<Rect> = displays.iter().map(|d| d.bounds).collect();
     // The main display is the one at the virtual-desktop origin.
     let main_screen = screens_cg.iter().position(|r| r.x == 0.0 && r.y == 0.0).unwrap_or(0);
-    // The bar's edge decides which strip the layout gives up, so it has to be known before the
-    // screens are cut. The daemon resolves it the same way for itself.
-    let bar_position = vase_windows::paths::load_config().bar_position.unwrap_or(backend.default_bar_position());
+    // The bar's edge and its height (which the theme's style decides) settle which strip the layout
+    // gives up, so both have to be known before the screens are cut. The daemon resolves them the
+    // same way for itself.
+    let config = vase_windows::paths::load_config();
+    vase_core::chrome::theme::set_theme(config.theme);
+    let bar_position = config.bar_position.unwrap_or(backend.default_bar_position());
     let screen_rects: Vec<Rect> = displays.iter().enumerate().map(|(i, d)| vase_core::chrome::usable(d.work_area, i == main_screen, bar_position)).collect();
 
     // Minimized windows stay in the enumeration on Windows, so one pass adopts everything; they show

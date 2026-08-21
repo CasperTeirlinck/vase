@@ -1,4 +1,4 @@
-//! The themeable palette and tab-bar mark.
+//! The theme: the style the chrome is drawn in, its palette, and the tab-bar mark.
 
 use std::cell::RefCell;
 use std::sync::LazyLock;
@@ -9,6 +9,48 @@ use crate::geometry::Rect;
 pub const PANE_RADIUS: f64 = 8.0;
 /// Inset between a pane's edge and its content.
 pub const PANE_PAD: f64 = 8.0;
+
+/// How the chrome is drawn: its shapes, spacing, and material, independent of the palette.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Style {
+    /// The platform's own design language: Liquid Glass on macOS. Platforms without a native style
+    /// of their own draw `Powerline` instead.
+    Native,
+    /// vase's own interlocking powerline bar, the same on every platform.
+    Powerline,
+}
+
+impl Style {
+    /// Height of a bar strip in this style: the main tab bar, and each stack's local bar.
+    pub const fn bar_height(self) -> f64 {
+        match self {
+            // A native control's proportions: room for a system-height pill inside the strip.
+            Style::Native => 28.0,
+            Style::Powerline => 22.0,
+        }
+    }
+
+    /// A built-in style by config name.
+    pub fn by_name(name: &str) -> Option<Style> {
+        match name.trim().to_lowercase().as_str() {
+            "native" => Some(Style::Native),
+            "powerline" => Some(Style::Powerline),
+            _ => None,
+        }
+    }
+}
+
+/// A theme: how the chrome is drawn, and the colors it is drawn in.
+#[derive(Clone, Copy)]
+pub struct Theme {
+    pub style: Style,
+    pub palette: Palette,
+}
+
+impl Theme {
+    /// The default: the platform's own chrome style, over vase's palette.
+    pub const DEFAULT: Theme = Theme { style: Style::Native, palette: ONE_DARK };
+}
 
 /// A semantic palette slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,7 +77,7 @@ pub enum Role {
 
 /// A full color palette; each field is sRGBA in 0..1.
 #[derive(Clone, Copy)]
-pub struct Theme {
+pub struct Palette {
     pub bg: [f64; 4],
     pub active: [f64; 4],
     pub dim_bg: [f64; 4],
@@ -47,7 +89,7 @@ pub struct Theme {
     pub hotkey: [f64; 4],
 }
 
-impl Theme {
+impl Palette {
     pub fn color(&self, role: Role) -> [f64; 4] {
         match role {
             Role::Bg => self.bg,
@@ -75,7 +117,7 @@ pub enum Mark {
 }
 
 // Atom One Dark backgrounds/text with the vase clay accent: the default.
-pub const ONE_DARK: Theme = Theme {
+pub const ONE_DARK: Palette = Palette {
     bg: [0.129, 0.145, 0.169, 1.0],
     active: [0.231, 0.247, 0.298, 1.0],
     dim_bg: [0.09, 0.10, 0.125, 1.0],
@@ -87,7 +129,7 @@ pub const ONE_DARK: Theme = Theme {
     hotkey: [0.85, 0.87, 0.90, 0.95],
 };
 
-const NORD: Theme = Theme {
+const NORD: Palette = Palette {
     bg: [0.180, 0.204, 0.251, 1.0],
     active: [0.263, 0.298, 0.369, 1.0],
     dim_bg: [0.153, 0.173, 0.212, 1.0],
@@ -99,7 +141,7 @@ const NORD: Theme = Theme {
     hotkey: [0.925, 0.937, 0.957, 0.95],
 };
 
-const GRUVBOX: Theme = Theme {
+const GRUVBOX: Palette = Palette {
     bg: [0.157, 0.157, 0.157, 1.0],
     active: [0.235, 0.220, 0.212, 1.0],
     dim_bg: [0.114, 0.125, 0.129, 1.0],
@@ -111,7 +153,7 @@ const GRUVBOX: Theme = Theme {
     hotkey: [0.984, 0.945, 0.780, 0.95],
 };
 
-const TOKYO_NIGHT: Theme = Theme {
+const TOKYO_NIGHT: Palette = Palette {
     bg: [0.102, 0.106, 0.149, 1.0],
     active: [0.161, 0.180, 0.259, 1.0],
     dim_bg: [0.086, 0.086, 0.118, 1.0],
@@ -123,7 +165,7 @@ const TOKYO_NIGHT: Theme = Theme {
     hotkey: [0.753, 0.792, 0.961, 0.95],
 };
 
-const CATPPUCCIN: Theme = Theme {
+const CATPPUCCIN: Palette = Palette {
     bg: [0.118, 0.118, 0.180, 1.0],
     active: [0.192, 0.196, 0.267, 1.0],
     dim_bg: [0.094, 0.094, 0.145, 1.0],
@@ -136,7 +178,7 @@ const CATPPUCCIN: Theme = Theme {
 };
 
 /// Windows' Fluent palette, so the chrome can read as native there. Greys follow the Fluent neutral ramp.
-const FLUENT_DARK: Theme = Theme {
+const FLUENT_DARK: Palette = Palette {
     bg: [0.129, 0.129, 0.129, 1.0],
     active: [0.216, 0.216, 0.216, 1.0],
     dim_bg: [0.102, 0.102, 0.102, 1.0],
@@ -149,7 +191,7 @@ const FLUENT_DARK: Theme = Theme {
 };
 
 /// The only light palette vase ships.
-const FLUENT_LIGHT: Theme = Theme {
+const FLUENT_LIGHT: Palette = Palette {
     bg: [0.973, 0.973, 0.973, 1.0],     // SolidBackgroundFillColorBase
     active: [0.902, 0.902, 0.902, 1.0], // ControlFillColorSecondary
     dim_bg: [0.937, 0.937, 0.937, 1.0],
@@ -162,7 +204,7 @@ const FLUENT_LIGHT: Theme = Theme {
 };
 
 /// A built-in theme by config name.
-pub fn by_name(name: &str) -> Option<Theme> {
+pub fn by_name(name: &str) -> Option<Palette> {
     match name.trim().to_lowercase().replace([' ', '_'], "-").as_str() {
         "one-dark" | "onedark" => Some(ONE_DARK),
         "nord" => Some(NORD),
@@ -195,7 +237,7 @@ pub fn parse_hex(s: &str) -> Option<[f64; 4]> {
 
 // Set at startup and on a config reload; every painter reads this same pair.
 thread_local! {
-    static CURRENT: RefCell<Theme> = const { RefCell::new(ONE_DARK) };
+    static CURRENT: RefCell<Theme> = const { RefCell::new(Theme::DEFAULT) };
     static MARK: RefCell<Mark> = const { RefCell::new(Mark::Logo) };
 }
 
@@ -203,8 +245,12 @@ pub fn set_theme(theme: Theme) {
     CURRENT.with(|c| *c.borrow_mut() = theme);
 }
 
-pub fn theme() -> Theme {
-    CURRENT.with(|c| *c.borrow())
+pub fn style() -> Style {
+    CURRENT.with(|c| c.borrow().style)
+}
+
+pub fn palette() -> Palette {
+    CURRENT.with(|c| c.borrow().palette)
 }
 
 pub fn set_mark(mark: Mark) {

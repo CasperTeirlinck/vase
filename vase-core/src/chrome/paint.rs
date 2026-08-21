@@ -2,7 +2,7 @@
 
 use crate::geometry::Rect;
 
-use super::bar::BarLayout;
+use super::bar::{Bar, Hits};
 
 /// One row of a list.
 pub struct SwitchRow {
@@ -31,23 +31,24 @@ pub enum ListAt {
 
 /// Everything vase paints, as native drawing calls.
 ///
-/// The core lays every surface out and an implementation strokes what it is given, so the bar's
-/// proportions are the same on every platform. `measure` is the one number only a platform can
-/// supply, and the core feeds it back into the layout.
+/// The core decides *what* every surface shows and where it sits; the style decides how it is drawn.
+/// A painter drawing vase's own powerline bar lays it out with `chrome::powerline`; one drawing its
+/// platform's native chrome lays that out itself, and hands back where the tabs landed so clicks
+/// still route.
 pub trait Painter {
     /// Width of `text` at `size` points, in the font this painter draws bar and list text in.
     fn measure(&self, text: &str, size: f64) -> f64;
 
-    fn bar(&mut self, layout: &BarLayout);
+    /// Draw the screen's tab bar, returning each tab's clickable span.
+    fn bar(&mut self, bar: &Bar) -> Hits;
 
-    /// Draw the bar as a command line rather than tabs. `layout` carries the strip and the leading
-    /// mark; it has no tabs.
-    fn prompt(&mut self, layout: &BarLayout, text: &str);
+    /// Draw the bar as a command line rather than tabs: the strip and the leading mark, then `text`.
+    fn prompt(&mut self, rect: Rect, text: &str);
 
     fn hide_bar(&mut self);
 
     /// Draw one local bar per visible stack, growing the surface pool to fit.
-    fn stack_bars(&mut self, layouts: &[BarLayout]);
+    fn stack_bars(&mut self, bars: &[Bar]) -> Vec<Hits>;
 
     /// Placeholder containers for the current tab's empty panes; the flag marks the focused one.
     fn panes(&mut self, panes: &[(Rect, bool)]);

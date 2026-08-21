@@ -40,8 +40,9 @@ backend crate. macOS and Windows are available today; Linux is planned.
   (tabbed containers) inside a pane, up to two levels deep.
 - **Multi-monitor**: tabs live per display; send a tab to another monitor in
   one keystroke. Layout survives quit/restart and monitor hotplug.
-- **A powerline-style tab bar** no wasted space, with app icons, `prefix-N` numbers for quick switching, dimmed off-monitor
-  tabs, and notification-badge dots.
+- **A tab bar that looks like the OS**: macOS Tahoe's Liquid Glass by default, or vase's own powerline style, both
+  with no wasted space, app icons, `prefix-N` numbers for quick switching, dimmed off-monitor tabs, and
+  notification-badge dots.
 - **Window switcher and pane picker**: searchable trees that mirror your layout hierarchy.
 
 ## Install
@@ -164,6 +165,15 @@ app = "Ghostty"
 
 Chord syntax joins modifiers with `+`, for example `ctrl+grave`, `cmd+shift+k`,
 or `alt+space`.
+
+It also holds the theme: `style` picks how the chrome is drawn, `name` picks a
+palette for the powerline style. The native style takes its colors, font, and
+accent from the system instead.
+
+```toml
+[theme]
+style = "native" # or "powerline"
+```
 
 Edit it from the menu-bar / tray **Settings** item, then **Reload config** to
 apply it without restarting.

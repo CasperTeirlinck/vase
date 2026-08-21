@@ -8,18 +8,17 @@
 use std::collections::HashSet;
 
 use crate::config::AppFocus;
-use crate::geometry::{Rect, BAR_HEIGHT};
+use crate::geometry::Rect;
 use crate::model::{Command, Model};
 use crate::registry::{app_matches, clean_title, Registry};
 use crate::tree::WindowId;
 
-use super::bar::{self, BarLayout, BarTab};
+use super::bar::{Bar, BarTab, Hits};
 use super::paint::{ListAt, Painter, SwitchRow};
-use super::theme;
 use super::Position;
 
 /// A drawn bar's click map: its rect, per-tab hit ranges, and what each range selects.
-pub(crate) type ClickMap = (Rect, Vec<(f64, f64)>, Vec<WindowId>);
+pub(crate) type ClickMap = (Rect, Hits, Vec<WindowId>);
 
 /// What the chrome needs on top of the model to draw a frame.
 pub struct Context<'a> {
@@ -46,7 +45,7 @@ pub struct Context<'a> {
 pub struct Deck<C: Painter> {
     painter: C,
     /// Hit ranges from the last `sync`, in the order the bars were drawn.
-    bar_hits: Option<(Rect, Vec<(f64, f64)>)>,
+    bar_hits: Option<(Rect, Hits)>,
     stack_hits: Vec<ClickMap>,
 }
 
@@ -88,24 +87,18 @@ impl<C: Painter> Deck<C> {
         self.painter.prewarm_icon(app);
     }
 
-    /// Lay a bar out against the painter's own text metrics.
-    fn lay_out(&self, rect: Rect, tabs: &[BarTab], selected: usize, armed: bool, main: bool) -> BarLayout {
-        let measure = |text: &str, size: f64| self.painter.measure(text, size);
-        bar::layout(rect, tabs, selected, armed, main, &theme::mark(), &measure)
-    }
-
     fn sync_bar(&mut self, model: &Model, ctx: &Context) {
         let screen = model.screens[ctx.main_screen].rect;
         // The bar's rect: the reserved strip on the far side of the content rect, full width.
+        let strip = super::bar_height();
         let bar_y = match ctx.bar_position {
-            Position::Top => screen.y - BAR_HEIGHT,
+            Position::Top => screen.y - strip,
             Position::Bottom => screen.y + screen.h,
         };
-        let bar_rect = Rect::new(screen.x, bar_y, screen.w, BAR_HEIGHT);
+        let bar_rect = Rect::new(screen.x, bar_y, screen.w, strip);
         // While the command line is open it owns the bar; no tabs, and no click targets.
         if let Some(line) = &ctx.prompt {
-            let layout = self.lay_out(bar_rect, &[], 0, ctx.prefix_armed, true);
-            self.painter.prompt(&layout, line);
+            self.painter.prompt(bar_rect, line);
             self.bar_hits = None;
             return;
         }
@@ -142,9 +135,8 @@ impl<C: Painter> Deck<C> {
                 BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, off_workspace, hotkey }
             })
             .collect();
-        let layout = self.lay_out(bar_rect, &bar_tabs, selected, ctx.prefix_armed, true);
-        self.bar_hits = Some((bar_rect, layout.hit_ranges()));
-        self.painter.bar(&layout);
+        let bar = Bar { rect: bar_rect, tabs: &bar_tabs, selected, main: true, armed: ctx.prefix_armed };
+        self.bar_hits = Some((bar_rect, self.painter.bar(&bar)));
     }
 
     fn sync_stack_bars(&mut self, model: &Model, ctx: &Context) {
@@ -176,12 +168,12 @@ impl<C: Painter> Deck<C> {
                         BarTab { icons: vec![app], badges: vec![badged], label, zoomed: false, number: i + 1, dim: false, off_workspace, hotkey: false }
                     })
                     .collect();
-                (Rect::new(stack.rect.x, stack.rect.y, stack.rect.w, BAR_HEIGHT), tabs, stack.selected)
+                (Rect::new(stack.rect.x, stack.rect.y, stack.rect.w, super::bar_height()), tabs, stack.selected)
             })
             .collect();
-        let layouts: Vec<BarLayout> = bars.iter().map(|(rect, tabs, selected)| self.lay_out(*rect, tabs, *selected, false, false)).collect();
-        self.stack_hits = layouts.iter().zip(&stacks).map(|(layout, stack)| (layout.rect, layout.hit_ranges(), stack.items.clone())).collect();
-        self.painter.stack_bars(&layouts);
+        let strips: Vec<Bar> = bars.iter().map(|(rect, tabs, selected)| Bar { rect: *rect, tabs, selected: *selected, main: false, armed: false }).collect();
+        let hits = self.painter.stack_bars(&strips);
+        self.stack_hits = strips.iter().zip(hits).zip(&stacks).map(|((strip, hits), stack)| (strip.rect, hits, stack.items.clone())).collect();
     }
 
     fn sync_panes(&mut self, model: &Model, ctx: &Context) {

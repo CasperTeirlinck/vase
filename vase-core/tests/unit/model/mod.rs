@@ -1,5 +1,6 @@
+use crate::chrome::bar_height;
 use crate::focus::Direction;
-use crate::geometry::{Rect, BAR_HEIGHT};
+use crate::geometry::Rect;
 use crate::model::*;
 use crate::tree::{windows, Dir, Node, Pane, PaneId, WindowId};
 use std::collections::{HashMap, HashSet};

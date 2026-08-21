@@ -1,27 +1,28 @@
-//! Laying out a powerline bar.
+//! What a bar shows, and the pieces every style lays its content out of.
 //!
-//! Pure geometry. Text width is the one thing a platform must supply.
+//! How a bar is *drawn* belongs to a style: `chrome::powerline` lays out vase's own powerline bar
+//! for any platform, a native style lays itself out in its platform's crate.
 
-use super::theme::{Mark, Role};
-use super::{BAR_HEIGHT, FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
+use super::theme::Role;
+use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
 use crate::geometry::Rect;
-
-pub const TAB_ICON: f64 = 14.0;
-const TAB_ICON_GAP: f64 = 4.0;
-/// Label width past which a label ellipsizes.
-const MAX_TAB_TEXT: f64 = 140.0;
-/// Diameter of the prefix indicator dot.
-pub const DOT_D: f64 = 8.0;
-/// Padding on both sides of the prefix dot.
-const DOT_PAD: f64 = 9.0;
-/// Gap between a tab's notch and its first content.
-const CONTENT_GAP: f64 = 5.0;
-const RIGHT_PAD: f64 = 6.0;
-/// Leading padding inside a cap-left tab.
-const CAP_PAD: f64 = 8.0;
 
 /// Measures a string's width, at `size` points, in the painter's own font.
 pub type Measure<'a> = &'a dyn Fn(&str, f64) -> f64;
+
+/// Where each tab of a drawn bar can be clicked: bar-local x spans, in tab order.
+pub type Hits = Vec<(f64, f64)>;
+
+/// A bar to draw: the screen's tab bar, or one stack's local bar.
+pub struct Bar<'a> {
+    pub rect: Rect,
+    pub tabs: &'a [BarTab],
+    pub selected: usize,
+    /// The screen's tab bar, which carries the mark and the prefix indicator. A stack bar carries neither.
+    pub main: bool,
+    /// The prefix chord is armed.
+    pub armed: bool,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BarTab {
@@ -40,155 +41,56 @@ pub struct BarTab {
     pub hotkey: bool,
 }
 
-/// A positioned piece of a tab's content, in bar-local bottom-left coordinates.
+/// A positioned piece of a tab's content, in whatever coordinates the style laid the tab out in.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Run {
     Text { x: f64, text: String, color: Role },
     Icon { x: f64, app: String, dim: bool, badge: bool },
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct TabShape {
-    pub x0: f64,
-    pub x1: f64,
-    /// First tab of a bar with no leading pill: a rounded cap instead of a notch.
-    pub cap_left: bool,
-    pub fill: Role,
-    pub hotkey: bool,
-    pub content: Vec<Run>,
+/// The spacing a style lays a tab's content out by.
+pub struct Metrics {
+    /// Inset from the tab's own x0 to its first run, clearing whatever shape the style starts the tab with.
+    pub content_left: f64,
+    pub right_pad: f64,
+    /// Gap between the position number and the first icon.
+    pub number_gap: f64,
+    pub icon: f64,
+    pub icon_gap: f64,
+    /// Label width past which a label ellipsizes.
+    pub max_label: f64,
 }
 
-/// The leading powerline block carrying the brand mark.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Lead {
-    /// Right edge, where the first tab's notch nests.
-    pub width: f64,
-    pub glyph: LeadGlyph,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum LeadGlyph {
-    /// The vase silhouette.
-    Logo(Rect),
-    /// A user glyph.
-    Glyph { x: f64, text: String, size: f64 },
-}
-
-/// A laid-out bar, ready to paint.
-#[derive(Debug, Clone, PartialEq)]
-pub struct BarLayout {
-    /// The strip's rect in global top-left coordinates.
-    pub rect: Rect,
-    pub lead: Option<Lead>,
-    pub tabs: Vec<TabShape>,
-    /// The prefix indicator: center x, and whether it is armed.
-    pub dot: Option<(f64, bool)>,
-    /// Radius of every notch and bulge. A full semicircle, so tab ends run full height.
-    pub radius: f64,
-    /// Content past this x is clipped, so tabs never reach the prefix dot.
-    pub content_w: f64,
-}
-
-impl BarLayout {
-    /// Each tab's clickable span. Shifted `radius` right of the logical `[x0, x1]` so clicking a
-    /// tab's right bulge selects that tab, not the one nesting into it.
-    pub fn hit_ranges(&self) -> Vec<(f64, f64)> {
-        self.tabs.iter().map(|t| (t.x0 + self.radius, t.x1 + self.radius)).collect()
-    }
-}
-
-/// Lay out a bar. `main` is the screen's tab bar, which carries the mark and the prefix dot.
-pub fn layout(rect: Rect, tabs: &[BarTab], selected: usize, armed: bool, main: bool, mark: &Mark, measure: Measure) -> BarLayout {
-    let radius = BAR_HEIGHT / 2.0;
-    let dot_x = rect.w - DOT_D - DOT_PAD;
-    let content_w = if main { (dot_x - DOT_PAD).max(0.0) } else { rect.w };
-    // No leading pill on a stack bar, or when the mark is hidden: the first tab caps at the strip's
-    // rounded corner instead of nesting into a pill.
-    let lead = if main { lead_pill(mark, measure) } else { None };
-    let capped_start = lead.is_none();
-    let mut cursor = lead.as_ref().map_or(radius, |l| l.width);
-
-    let shapes = tabs
-        .iter()
-        .enumerate()
-        .map(|(i, tab)| {
-            let cap_left = capped_start && i == 0;
-            let (body_w, content) = tab_content(tab, cursor, cap_left, measure);
-            let shape = TabShape {
-                x0: cursor,
-                x1: cursor + body_w,
-                cap_left,
-                fill: if tab.dim {
-                    Role::DimBg
-                } else if i == selected {
-                    Role::Active
-                } else {
-                    Role::Bg
-                },
-                hotkey: tab.hotkey,
-                content,
-            };
-            cursor += body_w;
-            shape
-        })
-        .collect();
-
-    BarLayout { rect, lead, tabs: shapes, dot: main.then_some((dot_x, armed)), radius, content_w }
-}
-
-/// The leading block: a rounded-left cap, a glyph slot, and a convex-right bulge the first tab nests into.
-fn lead_pill(mark: &Mark, measure: Measure) -> Option<Lead> {
-    let cap = BAR_HEIGHT / 2.0;
-    let slot_x = cap + 3.0;
-    match mark {
-        Mark::Hidden => None,
-        // A user glyph sizes the slot to its own width; the logo uses a fixed slot.
-        Mark::Glyph(g) => {
-            let size = FONT_SIZE + 1.0;
-            let text_w = measure(g, size);
-            let slot_w = text_w.max(14.0);
-            Some(Lead { width: slot_x + slot_w + 4.0, glyph: LeadGlyph::Glyph { x: slot_x + (slot_w - text_w) / 2.0, text: g.clone(), size } })
-        }
-        Mark::Logo => {
-            let slot_w = 18.0;
-            let h = BAR_HEIGHT - 8.0;
-            let w = h * super::theme::vase_mark().aspect;
-            let rect = Rect::new(slot_x + (slot_w - w) / 2.0, (BAR_HEIGHT - h) / 2.0, w, h);
-            Some(Lead { width: slot_x + slot_w + 4.0, glyph: LeadGlyph::Logo(rect) })
-        }
-    }
-}
-
-fn tab_content(tab: &BarTab, x0: f64, cap_left: bool, measure: Measure) -> (f64, Vec<Run>) {
+/// One tab's content: its width, and its runs placed from `x0`.
+///
+/// The order is the same in every style: off-workspace marker, position number, app icons, label.
+pub fn content(tab: &BarTab, x0: f64, m: &Metrics, measure: Measure) -> (f64, Vec<Run>) {
     let text_color = if tab.dim { Role::Dim } else { Role::Text };
-    let label = ellipsize(&tab.label, MAX_TAB_TEXT, measure);
+    let label = ellipsize(&tab.label, m.max_label, measure);
     let label = if tab.zoomed { format!("{label} Z") } else { label };
     let label_w = if label.is_empty() { 0.0 } else { measure(&label, FONT_SIZE) };
 
-    // Grey position number, with a leading marker when a window in the tab is on another workspace.
     let workspace = tab.off_workspace.then(|| format!("{WORKSPACE_MARK} "));
     let number = format!("{} ", tab.number);
     let workspace_w = workspace.as_deref().map_or(0.0, |s| measure(s, FONT_SIZE));
     let number_w = measure(&number, FONT_SIZE);
 
-    // A capped-start tab clears its rounded cap; every other tab clears its notch.
-    let content_left = if cap_left { CAP_PAD } else { BAR_HEIGHT / 2.0 + CONTENT_GAP };
     let n = tab.icons.len() as f64;
     // A trailing label needs a gap after the last icon; a tab that is icons-only does not.
-    let icons_w = if label_w > 0.0 { n * (TAB_ICON + TAB_ICON_GAP) } else { n * TAB_ICON + (n - 1.0).max(0.0) * TAB_ICON_GAP };
-    let body_w = content_left + workspace_w + number_w + icons_w + label_w + RIGHT_PAD;
+    let icons_w = if label_w > 0.0 { n * (m.icon + m.icon_gap) } else { n * m.icon + (n - 1.0).max(0.0) * m.icon_gap };
+    let body_w = m.content_left + workspace_w + number_w + m.number_gap + icons_w + label_w + m.right_pad;
 
     let mut runs = Vec::new();
-    let mut x = x0 + content_left;
+    let mut x = x0 + m.content_left;
     if let Some(w) = workspace {
         runs.push(Run::Text { x, text: w, color: Role::Accent });
         x += workspace_w;
     }
     runs.push(Run::Text { x, text: number, color: Role::Dim });
-    x += number_w;
+    x += number_w + m.number_gap;
     for (i, app) in tab.icons.iter().enumerate() {
         runs.push(Run::Icon { x, app: app.clone(), dim: tab.dim, badge: tab.badges.get(i).copied().unwrap_or(false) });
-        x += TAB_ICON + TAB_ICON_GAP;
+        x += m.icon + m.icon_gap;
     }
     if label_w > 0.0 {
         runs.push(Run::Text { x, text: label, color: text_color });

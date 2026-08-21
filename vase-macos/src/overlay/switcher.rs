@@ -2,13 +2,15 @@
 
 use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBox, NSBoxType, NSColor, NSFont, NSTextAlignment, NSTextField, NSTitlePosition};
+use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBox, NSBoxType, NSColor, NSTextAlignment, NSTextField, NSTitlePosition, NSView};
 use objc2_foundation::{NSMutableAttributedString, NSPoint, NSRect, NSSize, NSString};
+use vase_core::chrome::theme::{style, Role, Style};
 use vase_core::chrome::{scroll_offset, SwitchRow};
 use vase_core::geometry::Rect;
 
+use super::glass::backdrop;
 use super::panel::Panel;
-use super::text::{icon_run, segment};
+use super::text::{chrome_font, icon_run, segment};
 use super::theme::*;
 use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
 
@@ -23,8 +25,8 @@ struct Frame {
     rect: Rect,
     /// How many item rows fit under the header.
     rows: usize,
-    border: f64,
-    border_color: Retained<NSColor>,
+    /// Width and color of the card's outline, when it carries one.
+    outline: Option<(f64, Retained<NSColor>)>,
     /// Left inset and width of the selection highlight.
     highlight: (f64, f64),
     /// Whether to mark the focused window with a left accent bar.
@@ -51,14 +53,15 @@ impl SwitcherView {
         let rows = items.len().min(fit.saturating_sub(1).max(1));
         let h = (rows + 1) as f64 * SWITCHER_ROW_H + 2.0 * PANE_PAD;
         let rect = Rect::new(screen.x + (screen.w - SWITCHER_WIDTH) / 2.0, screen.y + (screen.h - h) / 2.0, SWITCHER_WIDTH, h);
+        let native = matches!(style(), Style::Native);
         self.draw(
             &Frame {
                 rect,
                 rows,
-                border: 1.0,
-                border_color: tab_border(),
-                // Reach the card's inner edges, just inside the 1px border; the text stays inset.
-                highlight: (1.0, SWITCHER_WIDTH - 2.0),
+                // Glass carries its own edge; a themed card needs a hairline to lift it off the desktop.
+                outline: (!native).then(|| (1.0, tab_border())),
+                // A themed card's highlight reaches its inner edges, just inside that hairline; a native one is an inset capsule.
+                highlight: if native { (PANE_PAD / 2.0, SWITCHER_WIDTH - PANE_PAD) } else { (1.0, SWITCHER_WIDTH - 2.0) },
                 accent: true,
             },
             header,
@@ -77,8 +80,7 @@ impl SwitcherView {
                 rect: area,
                 rows: fit.saturating_sub(1).max(1),
                 // Heavier border in the accent color, so an empty pane reads as a container, not a void.
-                border: 2.0,
-                border_color: pane_border(),
+                outline: Some((2.0, pane_border())),
                 highlight: (PANE_PAD, inner_w),
                 accent: false,
             },
@@ -98,15 +100,24 @@ impl SwitcherView {
         let content = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w, h));
         let mut labels = Vec::new();
 
-        // Themed rounded card matching the tab bar.
-        let bg = NSBox::initWithFrame(NSBox::alloc(self.mtm), content);
-        bg.setBoxType(NSBoxType::Custom);
-        bg.setTitlePosition(NSTitlePosition::NoTitle);
-        bg.setCornerRadius(PANE_RADIUS);
-        bg.setFillColor(&strip_bg());
-        bg.setBorderWidth(frame.border);
-        bg.setBorderColor(&frame.border_color);
-        container.addSubview(&bg);
+        // The card, matching the tab bar: a glass panel under the native style, a themed box under the
+        // powerline one. Rows go inside it either way, which is what earns them the material's own
+        // legibility treatment.
+        let radius = card_radius();
+        let inner = NSView::initWithFrame(NSView::alloc(self.mtm), content);
+        match style() {
+            Style::Native => container.addSubview(&backdrop(self.mtm, content, radius, Some(&inner))),
+            Style::Powerline => {
+                container.addSubview(&card(self.mtm, content, radius, &strip_bg()));
+                container.addSubview(&inner);
+            }
+        }
+        if let Some((width, color)) = &frame.outline {
+            let outline = card(self.mtm, content, radius, &NSColor::clearColor());
+            outline.setBorderWidth(*width);
+            outline.setBorderColor(color);
+            container.addSubview(&outline);
+        }
 
         // Rows inset within the card padding; header is row 0 (AppKit bottom-left, so the top row has the largest y).
         let inner_w = (w - 2.0 * PANE_PAD).max(0.0);
@@ -114,8 +125,8 @@ impl SwitcherView {
         let qy = top - SWITCHER_ROW_H;
         // Reserve the marker gutter on every row once any row carries a marker, so index numbers stay column-aligned.
         let reserve = items.iter().any(|r| r.off_workspace || r.favorite);
-        let qlabel = self.make_label(0, "", &[], header, true, false, false, false, reserve, PANE_PAD, qy, inner_w);
-        container.addSubview(&qlabel);
+        let qlabel = self.make_label(0, "", &[], header, true, false, false, false, false, reserve, PANE_PAD, qy, inner_w);
+        inner.addSubview(&qlabel);
         labels.push(qlabel);
 
         // Scroll a window of items so the selection stays visible.
@@ -123,16 +134,17 @@ impl SwitcherView {
         for vis in 0..frame.rows {
             let Some(row) = items.get(offset + vis) else { break };
             let ry = top - ((vis + 2) as f64) * SWITCHER_ROW_H;
-            if offset + vis == selected {
+            let picked = offset + vis == selected;
+            if picked {
                 let (hx, hw) = frame.highlight;
-                container.addSubview(&self.bar(hx, ry, hw, &active_bg()));
+                inner.addSubview(&self.bar(hx, ry, hw, &active_bg(), radius));
             }
             // The left accent marks the focused window, so it stays marked as the selection moves away.
             if frame.accent && row.current {
-                container.addSubview(&self.bar(1.0, ry, 3.0, &accent()));
+                inner.addSubview(&self.bar(1.0, ry, 3.0, &accent(), 0.0));
             }
-            let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, row.dim, row.off_workspace, row.favorite, reserve, PANE_PAD, ry, inner_w);
-            container.addSubview(&label);
+            let label = self.make_label(row.number, &row.prefix, &row.icons, &row.label, false, picked, row.dim, row.off_workspace, row.favorite, reserve, PANE_PAD, ry, inner_w);
+            inner.addSubview(&label);
             labels.push(label);
         }
 
@@ -148,6 +160,7 @@ impl SwitcherView {
         icons: &[String],
         text: &str,
         is_query: bool,
+        picked: bool,
         dim: bool,
         off_workspace: bool,
         favorite: bool,
@@ -157,8 +170,10 @@ impl SwitcherView {
         width: f64,
     ) -> Retained<NSTextField> {
         // Content order: accent marker gutter, grey index number, tree glyph, app icons, then text.
-        let font = NSFont::monospacedSystemFontOfSize_weight(FONT_SIZE, 0.0);
-        let text_color = if is_query { dim_col() } else { text_col() };
+        let font = chrome_font(FONT_SIZE);
+        // A picked row sits on the selection fill, which the primary text color cannot always survive.
+        let (text_color, dim_color) = if picked { (active_text(Role::Text), active_text(Role::Dim)) } else { (text_col(), dim_col()) };
+        let text_color = if is_query { dim_col() } else { text_color };
         let combined = NSMutableAttributedString::new();
         // Leading gutter, reserved on every row when any row carries a marker so numbers stay aligned.
         if reserve {
@@ -174,10 +189,10 @@ impl SwitcherView {
         }
         if number > 0 {
             // Right-aligned in a 2-wide gutter so single/double digits line up.
-            combined.appendAttributedString(&segment(&format!("{number:>2} "), &font, &dim_col(), None));
+            combined.appendAttributedString(&segment(&format!("{number:>2} "), &font, &dim_color, None));
         }
         if !prefix.is_empty() {
-            combined.appendAttributedString(&segment(prefix, &font, &dim_col(), None));
+            combined.appendAttributedString(&segment(prefix, &font, &dim_color, None));
         }
         for app in icons {
             if let Some(icon) = icon_run(app, 16.0, &font) {
@@ -202,14 +217,25 @@ impl SwitcherView {
         label
     }
 
-    /// A full-height row bar: the selection highlight, or the thin focused-window accent. Squared corners so a highlight reaches the card's inner edges.
-    fn bar(&self, x: f64, y: f64, width: f64, color: &NSColor) -> Retained<NSBox> {
+    /// A full-height row bar: the selection highlight, or the thin focused-window accent.
+    fn bar(&self, x: f64, y: f64, width: f64, color: &NSColor, radius: f64) -> Retained<NSBox> {
         let bar = NSBox::initWithFrame(NSBox::alloc(self.mtm), NSRect::new(NSPoint::new(x, y), NSSize::new(width, SWITCHER_ROW_H)));
         bar.setBoxType(NSBoxType::Custom);
         bar.setTitlePosition(NSTitlePosition::NoTitle);
-        bar.setCornerRadius(0.0);
+        bar.setCornerRadius(radius);
         bar.setFillColor(color);
         bar.setBorderWidth(0.0);
         bar
     }
+}
+
+/// The list's card: a rounded, title-less box ready for a fill or an outline.
+fn card(mtm: MainThreadMarker, frame: NSRect, radius: f64, fill: &NSColor) -> Retained<NSBox> {
+    let card = NSBox::initWithFrame(NSBox::alloc(mtm), frame);
+    card.setBoxType(NSBoxType::Custom);
+    card.setTitlePosition(NSTitlePosition::NoTitle);
+    card.setCornerRadius(radius);
+    card.setFillColor(fill);
+    card.setBorderWidth(0.0);
+    card
 }

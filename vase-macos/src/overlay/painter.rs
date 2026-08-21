@@ -1,20 +1,17 @@
 //! The AppKit painter: every surface the core asks for, drawn as non-activating panels.
 
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSFont};
-use vase_core::chrome::bar::BarLayout;
+use vase_core::chrome::bar::{Bar, Hits};
 use vase_core::chrome::{ListAt, Painter, SwitchRow};
 use vase_core::geometry::Rect;
 
 use super::panes::{FocusBorder, PaneOverlay};
 use super::switcher::SwitcherView;
 use super::tab_bar::TabBar;
-use super::text::segment;
-use super::theme::text_col;
 
 pub struct AppKitPainter {
     bar: TabBar,
-    /// Pool of local powerline bars, one drawn in each visible stack's top strip.
+    /// Pool of local bars, one drawn in each visible stack's top strip.
     stack_bars: Vec<TabBar>,
     panes: PaneOverlay,
     focus_border: FocusBorder,
@@ -31,32 +28,30 @@ impl AppKitPainter {
 
 impl Painter for AppKitPainter {
     fn measure(&self, text: &str, size: f64) -> f64 {
-        let font = NSFont::monospacedSystemFontOfSize_weight(size, 0.0);
-        segment(text, &font, &text_col(), None).size().width
+        super::text::measure(text, size)
     }
 
-    fn bar(&mut self, layout: &BarLayout) {
-        self.bar.show(layout);
+    fn bar(&mut self, bar: &Bar) -> Hits {
+        self.bar.show(bar)
     }
 
-    fn prompt(&mut self, layout: &BarLayout, text: &str) {
-        self.bar.show_prompt(layout, text);
+    fn prompt(&mut self, rect: Rect, text: &str) {
+        self.bar.show_prompt(rect, text);
     }
 
     fn hide_bar(&mut self) {
         self.bar.hide();
     }
 
-    fn stack_bars(&mut self, layouts: &[BarLayout]) {
-        while self.stack_bars.len() < layouts.len() {
+    fn stack_bars(&mut self, bars: &[Bar]) -> Vec<Hits> {
+        while self.stack_bars.len() < bars.len() {
             self.stack_bars.push(TabBar::new(self.mtm));
         }
-        for (surface, layout) in self.stack_bars.iter_mut().zip(layouts) {
-            surface.show(layout);
-        }
-        for surface in &self.stack_bars[layouts.len()..] {
+        let hits = self.stack_bars.iter_mut().zip(bars).map(|(surface, bar)| surface.show(bar)).collect();
+        for surface in &self.stack_bars[bars.len()..] {
             surface.hide();
         }
+        hits
     }
 
     fn panes(&mut self, panes: &[(Rect, bool)]) {

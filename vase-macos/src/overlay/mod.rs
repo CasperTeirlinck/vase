@@ -1,5 +1,6 @@
 //! Non-activating, always-on-top overlay windows (AppKit). Main-thread only.
 
+mod glass;
 mod painter;
 mod panel;
 mod panes;
@@ -11,9 +12,9 @@ mod theme;
 
 pub use painter::AppKitPainter;
 pub use screens::all_screens;
-pub(crate) use tab_bar::vase_mark_bezier;
+pub(crate) use theme::vase_mark_bezier;
 
-pub use vase_core::chrome::{BAR_HEIGHT, FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
+pub use vase_core::chrome::{bar_height, FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
 
 use objc2::MainThreadMarker;
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};

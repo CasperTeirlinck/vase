@@ -22,6 +22,8 @@ between `CONTEXT.md` and the code should not have to translate.
 | **Screen**             | A physical monitor.                                                                                                                                                                                                                    | `Screen`                      | _(none)_                          |
 | **Managed / floating** | A _managed_ window participates in a layout tree; a _floating_ window overlaps freely (dialogs, non-resizable/transient windows, rule-excluded apps).                                                                                  | `backend::manageable`         | —                                 |
 | **Chrome**             | Everything vase paints on top of the windows: the tab bar, each stack's bar, empty-pane placeholders, the focus border, the switcher and picker lists.                                                                                 | `overlay::Overlays`           | tmux status line                  |
+| **Style**              | How the chrome is drawn: its shapes, spacing, and material. `native` is the platform's own design language (Liquid Glass on macOS), `powerline` vase's own interlocking bar.                                                            | `chrome::theme::Style`        | —                                 |
+| **Theme**              | A style plus the palette it is drawn in. The native style takes its colors from the system instead, so only the powerline style reads the palette.                                                                                      | `chrome::theme::Theme`        | —                                 |
 | **Prefix**             | The modal chord that arms vase to receive the next keystroke as a command. Two of them: `⌥a` for tabs and panes, `⌥e` redirecting the tab keys at the focused stack.                                                                   | `KeyRouter`, `keymap::router` | tmux prefix                       |
 | **Registry**           | What vase knows about each adopted window outside the layout: its app, title, pre-adoption frame, minimized state, last placement.                                                                                                     | `registry::Registry`          | —                                 | ra  |
 
@@ -47,13 +49,15 @@ between `CONTEXT.md` and the code should not have to translate.
   the chrome; it also **owns its keybindings** (a modal prefix needs in-process
   state).
 - **Config**: declarative TOML, read from the platform's own support directory.
-  Currently `[[app_focus]]` hotkeys, favorites, and the palette; the keymap lives
+  Currently `[[app_focus]]` hotkeys, favorites, and the theme; the keymap lives
   in `input::keymap` and is not yet user-configurable.
 - **Chrome**: transparent, non-activating, always-on-top surfaces, redrawn only
-  through `Overlays::sync`. The _layout_ is shared: `chrome::bar` turns tabs into
-  positioned shapes and runs, taking a text-measure closure as its only platform
-  input, so the powerline bar has the same proportions everywhere. Painting is
-  per-platform: AppKit on macOS, Direct2D on Windows.
+  through `Overlays::sync`. The core says _what_ a bar shows and where it sits
+  (`chrome::bar`); a _style_ says how it is drawn. `chrome::powerline` lays vase's
+  own bar out once, taking a text-measure closure as its only platform input, so
+  its proportions are the same everywhere; a platform with a native style lays
+  that one out itself and hands back the tab spans clicks route against. Painting
+  is per-platform: AppKit on macOS, Direct2D on Windows.
 - **New-window landing**: a new _managed_ window becomes its own tab, unless a
   launch into a focused empty pane is pending, in which case it fills that
   pane. Unmanaged windows are left alone.
