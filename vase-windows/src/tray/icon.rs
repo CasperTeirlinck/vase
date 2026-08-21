@@ -8,7 +8,7 @@ use windows::Win32::Graphics::Imaging::{CLSID_WICImagingFactory, GUID_WICPixelFo
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, HICON, ICONINFO};
 
-use vase_core::chrome::theme::{theme, vase_mark, Role};
+use vase_core::chrome::theme::{palette, vase_mark, Role};
 use vase_core::geometry::Rect;
 
 /// The largest size the shell scales down from for a single-image icon.
@@ -64,7 +64,7 @@ fn render() -> Option<Vec<u8>> {
         let w = h * vase_mark().aspect;
         let area = Rect::new((SIZE as f64 - w) / 2.0, MARGIN, w, h);
         let geometry = crate::chrome::paths::vase_mark(&factory, area, SIZE as f64).ok()?;
-        let accent = theme().color(Role::Accent);
+        let accent = palette().color(Role::Accent);
         let brush = target.CreateSolidColorBrush(&D2D1_COLOR_F { r: accent[0] as f32, g: accent[1] as f32, b: accent[2] as f32, a: accent[3] as f32 }, None).ok()?;
         target.BeginDraw();
         target.Clear(Some(&D2D1_COLOR_F::default()));

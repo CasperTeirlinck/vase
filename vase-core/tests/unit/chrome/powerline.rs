@@ -1,7 +1,10 @@
-use crate::chrome::bar::*;
-use crate::chrome::theme::{Mark, Role};
-use crate::chrome::BAR_HEIGHT;
+use crate::chrome::bar::{Bar, BarTab, Run};
+use crate::chrome::powerline::*;
+use crate::chrome::theme::{set_theme, Mark, Role, Style, Theme};
 use crate::geometry::Rect;
+
+/// The strip height these proportions are laid out against.
+const H: f64 = Style::Powerline.bar_height();
 
 /// A fixed-pitch stand-in for a painter's text metrics.
 fn measure(text: &str, size: f64) -> f64 {
@@ -13,11 +16,13 @@ fn tab(number: usize, label: &str) -> BarTab {
 }
 
 fn strip() -> Rect {
-    Rect::new(0.0, 780.0, 1000.0, BAR_HEIGHT)
+    Rect::new(0.0, 780.0, 1000.0, H)
 }
 
 fn lay(tabs: &[BarTab], selected: usize, main: bool, mark: &Mark) -> BarLayout {
-    layout(strip(), tabs, selected, false, main, mark, &measure)
+    // Lay out against the powerline style's own strip, whatever the default theme is.
+    set_theme(Theme { style: Style::Powerline, ..Theme::DEFAULT });
+    layout(&Bar { rect: strip(), tabs, selected, main, armed: false }, mark, &measure)
 }
 
 #[test]
@@ -42,7 +47,7 @@ fn the_first_tab_starts_at_the_lead_pill_and_caps_when_there_is_none() {
     for l in [lay(&tabs, 0, true, &Mark::Hidden), lay(&tabs, 0, false, &Mark::Logo)] {
         assert!(l.lead.is_none());
         assert!(l.tabs[0].cap_left);
-        assert_eq!(l.tabs[0].x0, BAR_HEIGHT / 2.0);
+        assert_eq!(l.tabs[0].x0, H / 2.0);
     }
 }
 
@@ -59,7 +64,7 @@ fn only_the_main_bar_carries_a_prefix_dot() {
 fn hit_ranges_sit_a_radius_right_of_the_logical_span() {
     let tabs = [tab(1, "one"), tab(2, "two")];
     let l = lay(&tabs, 0, true, &Mark::Logo);
-    let ranges = l.hit_ranges();
+    let ranges = l.hits();
     assert_eq!(ranges.len(), 2);
     for (shape, (a, b)) in l.tabs.iter().zip(&ranges) {
         assert_eq!(*a, shape.x0 + l.radius);

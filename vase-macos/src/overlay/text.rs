@@ -6,10 +6,27 @@ use objc2::AnyThread;
 use objc2_app_kit::NSColor;
 #[allow(deprecated)]
 use objc2_app_kit::NSObliquenessAttributeName;
-use objc2_app_kit::{NSAttributedStringAttachmentConveniences, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSImage, NSTextAttachment, NSWorkspace};
+use objc2_app_kit::{NSAttributedStringAttachmentConveniences, NSAttributedStringNSStringDrawing, NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSImage, NSTextAttachment, NSWorkspace};
 use objc2_foundation::{NSAttributedString, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use vase_core::chrome::theme::{style, Style};
+
+use super::theme::text_col;
+
+/// The font the chrome draws every label in: the system font under the native style, a monospaced
+/// one under the powerline style, whose fixed pitch keeps the interlocking tabs' widths predictable.
+pub(crate) fn chrome_font(size: f64) -> Retained<NSFont> {
+    match style() {
+        Style::Native => NSFont::systemFontOfSize(size),
+        Style::Powerline => NSFont::monospacedSystemFontOfSize_weight(size, 0.0),
+    }
+}
+
+/// Width of `text` at `size` points, in the font the chrome draws it in.
+pub(crate) fn measure(text: &str, size: f64) -> f64 {
+    segment(text, &chrome_font(size), &text_col(), None).size().width
+}
 
 thread_local! {
     static ICON_CACHE: RefCell<HashMap<String, Option<Retained<NSImage>>>> =

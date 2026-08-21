@@ -6,12 +6,12 @@ use crate::tree::WindowId;
 
 /// A bar 200 wide at y=780, one 50-wide range per tab.
 fn bar() -> (Rect, Vec<(f64, f64)>) {
-    (Rect::new(0.0, 780.0, 200.0, BAR_HEIGHT), vec![(0.0, 50.0), (50.0, 100.0), (100.0, 150.0), (150.0, 200.0)])
+    (Rect::new(0.0, 780.0, 200.0, bar_height()), vec![(0.0, 50.0), (50.0, 100.0), (100.0, 150.0), (150.0, 200.0)])
 }
 
 /// A stack bar sitting inside the content area, two items.
 fn stack() -> ClickMap {
-    (Rect::new(300.0, 100.0, 200.0, BAR_HEIGHT), vec![(0.0, 100.0), (100.0, 200.0)], vec![WindowId(7), WindowId(8)])
+    (Rect::new(300.0, 100.0, 200.0, bar_height()), vec![(0.0, 100.0), (100.0, 200.0)], vec![WindowId(7), WindowId(8)])
 }
 
 /// Two screens: 2 tabs on the first, 2 on the second.
@@ -59,7 +59,7 @@ fn a_click_on_a_stack_bar_selects_that_stack_item() {
 #[test]
 fn a_stack_bar_wins_over_the_tab_bar_where_they_overlap() {
     // A stack bar drawn across the tab bar's strip takes the click.
-    let overlapping = (Rect::new(0.0, 780.0, 200.0, BAR_HEIGHT), vec![(0.0, 200.0)], vec![WindowId(9)]);
+    let overlapping = (Rect::new(0.0, 780.0, 200.0, bar_height()), vec![(0.0, 200.0)], vec![WindowId(9)]);
     assert_eq!(route_click(&model(), Some(&bar()), &[overlapping], 30.0, 785.0), Some(Command::SelectStackWindow(WindowId(9))));
 }
 
@@ -71,7 +71,7 @@ fn with_no_bar_drawn_nothing_is_ours() {
 #[test]
 fn a_stale_range_past_the_end_of_the_tabs_selects_nothing() {
     // Ranges outlive a model that lost tabs; a hit past the end must not panic or pick wrongly.
-    let five = (Rect::new(0.0, 780.0, 500.0, BAR_HEIGHT), vec![(0.0, 100.0); 1]);
+    let five = (Rect::new(0.0, 780.0, 500.0, bar_height()), vec![(0.0, 100.0); 1]);
     let mut ranges = five.1.clone();
     ranges.extend([(100.0, 200.0), (200.0, 300.0), (300.0, 400.0), (400.0, 500.0)]);
     let wide = (five.0, ranges);

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::chrome::theme::{by_name, parse_hex, Mark, Theme, ONE_DARK};
+use crate::chrome::theme::{by_name, parse_hex, Mark, Palette, Style, Theme};
 use crate::chrome::Position;
 use crate::input::{Key, KeyCode, Mods};
 
@@ -27,7 +27,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: ONE_DARK, mark: Mark::Logo, bar_position: None, focus_border: false }
+        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: Theme::DEFAULT, mark: Mark::Logo, bar_position: None, focus_border: false }
     }
 }
 
@@ -111,9 +111,10 @@ struct RawAppFocus {
     app: String,
 }
 
-/// A named preset plus optional per-color hex overrides.
+/// A style, a named palette preset, and optional per-color hex overrides.
 #[derive(Deserialize, Default)]
 struct RawTheme {
+    style: Option<String>,
     name: Option<String>,
     bg: Option<String>,
     active: Option<String>,
@@ -128,7 +129,18 @@ struct RawTheme {
 
 impl RawTheme {
     fn resolve(self) -> Theme {
-        let mut theme = self.name.as_deref().and_then(by_name).unwrap_or(ONE_DARK);
+        let style = match self.style.as_deref() {
+            None => Theme::DEFAULT.style,
+            Some(name) => Style::by_name(name).unwrap_or_else(|| {
+                eprintln!("vase: config: unrecognized theme style {name:?}; using the platform's own");
+                Theme::DEFAULT.style
+            }),
+        };
+        Theme { style, palette: self.palette() }
+    }
+
+    fn palette(self) -> Palette {
+        let mut palette = self.name.as_deref().and_then(by_name).unwrap_or(Theme::DEFAULT.palette);
         let apply = |slot: &mut [f64; 4], hex: &Option<String>| {
             if let Some(h) = hex {
                 match parse_hex(h) {
@@ -137,16 +149,16 @@ impl RawTheme {
                 }
             }
         };
-        apply(&mut theme.bg, &self.bg);
-        apply(&mut theme.active, &self.active);
-        apply(&mut theme.dim_bg, &self.dim_bg);
-        apply(&mut theme.text, &self.text);
-        apply(&mut theme.dim, &self.dim);
-        apply(&mut theme.accent, &self.accent);
-        apply(&mut theme.badge, &self.badge);
-        apply(&mut theme.border, &self.border);
-        apply(&mut theme.hotkey, &self.hotkey);
-        theme
+        apply(&mut palette.bg, &self.bg);
+        apply(&mut palette.active, &self.active);
+        apply(&mut palette.dim_bg, &self.dim_bg);
+        apply(&mut palette.text, &self.text);
+        apply(&mut palette.dim, &self.dim);
+        apply(&mut palette.accent, &self.accent);
+        apply(&mut palette.badge, &self.badge);
+        apply(&mut palette.border, &self.border);
+        apply(&mut palette.hotkey, &self.hotkey);
+        palette
     }
 }
 

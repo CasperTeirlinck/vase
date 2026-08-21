@@ -20,19 +20,21 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         self.app_hotkeys = config.app_focus;
         self.favorites = config.favorites;
         self.focus_border = config.focus_border;
+        let strip = crate::chrome::bar_height();
         crate::chrome::theme::set_theme(config.theme);
         crate::chrome::theme::set_mark(config.mark);
         let position = config.bar_position.unwrap_or(self.backend.default_bar_position());
-        if position != self.bar_position {
-            self.bar_position = position;
-            // The strip the bar reserves is now on the other edge, so every screen's tileable area
-            // has to be recut and the windows moved into it.
+        let moved = position != self.bar_position;
+        self.bar_position = position;
+        // The strip the bar reserves may have changed edge (a new position) or height (a new style);
+        // either way every screen's tileable area has to be recut and the windows moved into it.
+        if moved || crate::chrome::bar_height() != strip {
             self.reserve_screens();
             if let Some(placements) = self.model.as_ref().map(|m| m.placements()) {
                 self.execute(vec![Effect::Render(placements)]);
             }
         }
-        self.refresh(); // palette, mark, and hotkey/favorite markers may have changed
+        self.refresh(); // theme, mark, and hotkey/favorite markers may have changed
     }
 
     /// Recut each screen's tileable area from its display, for a bar that has changed edge.

@@ -25,7 +25,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
-use vase_core::chrome::theme::{theme, Role};
+use vase_core::chrome::theme::{palette, Role};
 use vase_core::geometry::Rect;
 
 /// The vase chrome's window class. Registered once; the first `Surface` does it.
@@ -127,7 +127,7 @@ impl Gpu {
 
 /// A color from the active palette, as Direct2D wants it.
 pub fn color(role: Role) -> D2D1_COLOR_F {
-    let c = theme().color(role);
+    let c = palette().color(role);
     D2D1_COLOR_F { r: c[0] as f32, g: c[1] as f32, b: c[2] as f32, a: c[3] as f32 }
 }
 

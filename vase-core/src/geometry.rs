@@ -17,9 +17,6 @@ impl Rect {
     }
 }
 
-/// Height of a bar strip: the main tab bar, and each stack's local bar.
-pub const BAR_HEIGHT: f64 = 22.0;
-
 /// Index of the display whose bounds contain `frame`'s center (else 0).
 pub fn screen_of(frame: Rect, screens: &[Rect]) -> usize {
     let cx = frame.x + frame.w / 2.0;
@@ -48,7 +45,8 @@ pub fn layout(node: &Node, area: Rect, out: &mut Vec<(PaneId, Pane, Rect)>) {
         Node::Leaf { id, pane } => out.push((*id, *pane, area)),
         Node::Stack { id, items, selected } => {
             // Reserve the top strip for the bar; place only the selected item below.
-            let content = Rect::new(area.x, area.y + BAR_HEIGHT, area.w, area.h - BAR_HEIGHT);
+            let strip = crate::chrome::bar_height();
+            let content = Rect::new(area.x, area.y + strip, area.w, area.h - strip);
             out.push((*id, items[*selected], content));
         }
         Node::Split { dir, ratios, children } => {

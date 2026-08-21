@@ -9,9 +9,10 @@ use windows::Win32::Graphics::Direct2D::{ID2D1Brush, ID2D1DeviceContext, D2D1_DR
 use windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_METRICS;
 use windows_numerics::Vector2;
 
-use vase_core::chrome::bar::{BarLayout, Run, DOT_D, TAB_ICON};
-use vase_core::chrome::theme::{Role, PANE_PAD, PANE_RADIUS};
-use vase_core::chrome::{bar, ListAt, Painter, SwitchRow, BAR_HEIGHT, FONT_SIZE};
+use vase_core::chrome::bar::{self, Bar, Hits, Run};
+use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
+use vase_core::chrome::theme::{mark, Role, PANE_PAD, PANE_RADIUS};
+use vase_core::chrome::{bar_height, ListAt, Painter, SwitchRow, FONT_SIZE};
 use vase_core::geometry::{bbox, Rect};
 
 use gpu::{color, Gpu, Surface};
@@ -26,7 +27,7 @@ const LIST_MAX_SCREEN_FRAC: f64 = 0.85;
 pub struct D2DPainter {
     gpu: Gpu,
     bar: Surface,
-    /// Pool of local powerline bars, one per visible stack.
+    /// Pool of local bars, one per visible stack.
     stack_bars: Vec<Surface>,
     panes: Surface,
     focus: Surface,
@@ -40,20 +41,27 @@ impl D2DPainter {
         Ok(D2DPainter { bar: Surface::new(&gpu)?, stack_bars: Vec::new(), panes: Surface::new(&gpu)?, focus: Surface::new(&gpu)?, list: Surface::new(&gpu)?, icons: Icons::default(), gpu })
     }
 
+    /// Lay a bar out in the powerline style, against DirectWrite's own text metrics. Windows has no
+    /// native style of its own yet, so `Style::Native` draws this one too.
+    fn lay_out(&self, bar: &Bar) -> BarLayout {
+        let measure = |text: &str, size: f64| self.gpu.measure(text, size);
+        powerline::layout(bar, &mark(), &measure)
+    }
+
     /// Paint one laid-out bar into `surface`.
     fn paint_bar(gpu: &Gpu, icons: &Icons, surface: &mut Surface, layout: &BarLayout) {
-        let r = layout.radius;
+        let (h, r) = (bar_height(), layout.radius);
         let _ = surface.draw(gpu, layout.rect, |dc| unsafe {
             let factory = &gpu.factory;
             // The strip: a full-width rounded pill behind everything.
             if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Bg), None) {
-                let strip = D2D1_ROUNDED_RECT { rect: rect_f(0.0, 0.0, layout.rect.w, BAR_HEIGHT), radiusX: (BAR_HEIGHT / 2.0) as f32, radiusY: (BAR_HEIGHT / 2.0) as f32 };
+                let strip = D2D1_ROUNDED_RECT { rect: rect_f(0.0, 0.0, layout.rect.w, h), radiusX: (h / 2.0) as f32, radiusY: (h / 2.0) as f32 };
                 dc.FillRoundedRectangle(&strip, &brush);
             }
             let border = dc.CreateSolidColorBrush(&color(Role::Border), None).ok();
 
             if let Some(lead) = &layout.lead {
-                if let (Ok(path), Some(border)) = (paths::lead(factory, lead.width, r, BAR_HEIGHT), border.as_ref()) {
+                if let (Ok(path), Some(border)) = (paths::lead(factory, lead.width, r, h), border.as_ref()) {
                     if let Ok(fill) = dc.CreateSolidColorBrush(&color(Role::Bg), None) {
                         dc.FillGeometry(&path, &fill, None);
                     }
@@ -61,12 +69,12 @@ impl D2DPainter {
                 }
                 if let Ok(accent) = dc.CreateSolidColorBrush(&color(Role::Accent), None) {
                     match &lead.glyph {
-                        vase_core::chrome::bar::LeadGlyph::Logo(area) => {
-                            if let Ok(mark) = paths::vase_mark(factory, *area, BAR_HEIGHT) {
+                        LeadGlyph::Logo(area) => {
+                            if let Ok(mark) = paths::vase_mark(factory, *area, h) {
                                 dc.FillGeometry(&mark, &accent, None);
                             }
                         }
-                        vase_core::chrome::bar::LeadGlyph::Glyph { x, text, size } => {
+                        LeadGlyph::Glyph { x, text, size } => {
                             draw_text(gpu, dc, text, *size, *x, &accent);
                         }
                     }
@@ -74,7 +82,7 @@ impl D2DPainter {
             }
 
             for tab in &layout.tabs {
-                let Ok(path) = paths::tab(factory, tab.x0, tab.x1, tab.cap_left, r, BAR_HEIGHT) else { continue };
+                let Ok(path) = paths::tab(factory, tab.x0, tab.x1, tab.cap_left, r, h) else { continue };
                 if let Ok(fill) = dc.CreateSolidColorBrush(&color(tab.fill), None) {
                     dc.FillGeometry(&path, &fill, None);
                 }
@@ -89,7 +97,7 @@ impl D2DPainter {
                             }
                         }
                         Run::Icon { x, app, dim, badge } => {
-                            let y = (BAR_HEIGHT - TAB_ICON) / 2.0;
+                            let y = (h - TAB_ICON) / 2.0;
                             if let Some(bitmap) = icons.get(app) {
                                 let dest = rect_f(*x, y, TAB_ICON, TAB_ICON);
                                 dc.DrawBitmap(bitmap, Some(&dest), if *dim { 0.4 } else { 1.0 }, D2D1_INTERPOLATION_MODE_LINEAR, None, None);
@@ -107,7 +115,7 @@ impl D2DPainter {
             // Hotkey outlines last, so no neighbour's fill covers a convex-right side.
             if let Ok(bright) = dc.CreateSolidColorBrush(&color(Role::Hotkey), None) {
                 for tab in layout.tabs.iter().filter(|t| t.hotkey) {
-                    if let Ok(path) = paths::tab(factory, tab.x0, tab.x1, tab.cap_left, r, BAR_HEIGHT) {
+                    if let Ok(path) = paths::tab(factory, tab.x0, tab.x1, tab.cap_left, r, h) {
                         dc.DrawGeometry(&path, &bright, 1.5, None);
                     }
                 }
@@ -115,7 +123,7 @@ impl D2DPainter {
             if let Some((dot_x, armed)) = layout.dot {
                 let role = if armed { Role::Accent } else { Role::Dim };
                 if let Ok(brush) = dc.CreateSolidColorBrush(&color(role), None) {
-                    dc.FillEllipse(&ellipse(dot_x + DOT_D / 2.0, BAR_HEIGHT / 2.0, DOT_D / 2.0), &brush);
+                    dc.FillEllipse(&ellipse(dot_x + DOT_D / 2.0, h / 2.0, DOT_D / 2.0), &brush);
                 }
             }
         });
@@ -127,18 +135,19 @@ impl Painter for D2DPainter {
         self.gpu.measure(text, size)
     }
 
-    fn bar(&mut self, layout: &BarLayout) {
+    fn bar(&mut self, bar: &Bar) -> Hits {
         self.icons.collect(&self.gpu);
-        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, layout);
+        let layout = self.lay_out(bar);
+        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &layout);
         self.gpu.commit();
+        layout.hits()
     }
 
-    fn prompt(&mut self, layout: &BarLayout, text: &str) {
+    fn prompt(&mut self, rect: Rect, text: &str) {
         // The command line owns the bar: the mark stays, the tabs do not.
-        let bare = BarLayout { tabs: Vec::new(), dot: None, ..clone_shell(layout) };
+        let bare = self.lay_out(&Bar { rect, tabs: &[], selected: 0, main: true, armed: false }).bare();
         Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &bare);
-        let lead_w = bare.lead.as_ref().map_or(bare.radius, |l| l.width);
-        let x = lead_w + bare.radius + 5.0;
+        let x = bare.prompt_x();
         let gpu = &self.gpu;
         let _ = self.bar.draw(gpu, bare.rect, |dc| unsafe {
             if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Text), None) {
@@ -152,19 +161,21 @@ impl Painter for D2DPainter {
         self.bar.hide();
     }
 
-    fn stack_bars(&mut self, layouts: &[BarLayout]) {
+    fn stack_bars(&mut self, bars: &[Bar]) -> Vec<Hits> {
         self.icons.collect(&self.gpu);
-        while self.stack_bars.len() < layouts.len() {
+        while self.stack_bars.len() < bars.len() {
             let Ok(surface) = Surface::new(&self.gpu) else { break };
             self.stack_bars.push(surface);
         }
-        for (surface, layout) in self.stack_bars.iter_mut().zip(layouts) {
+        let layouts: Vec<BarLayout> = bars.iter().map(|bar| self.lay_out(bar)).collect();
+        for (surface, layout) in self.stack_bars.iter_mut().zip(&layouts) {
             Self::paint_bar(&self.gpu, &self.icons, surface, layout);
         }
-        for surface in &mut self.stack_bars[layouts.len()..] {
+        for surface in &mut self.stack_bars[bars.len()..] {
             surface.hide();
         }
         self.gpu.commit();
+        layouts.iter().map(BarLayout::hits).collect()
     }
 
     fn panes(&mut self, panes: &[(Rect, bool)]) {
@@ -311,11 +322,6 @@ impl Painter for D2DPainter {
     }
 }
 
-/// Everything but the tabs and the dot, for the command line to reuse.
-fn clone_shell(layout: &BarLayout) -> BarLayout {
-    BarLayout { rect: layout.rect, lead: layout.lead.clone(), tabs: Vec::new(), dot: None, radius: layout.radius, content_w: layout.content_w }
-}
-
 fn rect_f(x: f64, y: f64, w: f64, h: f64) -> D2D_RECT_F {
     D2D_RECT_F { left: x as f32, top: y as f32, right: (x + w) as f32, bottom: (y + h) as f32 }
 }
@@ -329,7 +335,7 @@ fn draw_text(gpu: &Gpu, dc: &ID2D1DeviceContext, text: &str, size: f64, x: f64, 
     let Ok(layout) = gpu.layout(text, size) else { return };
     let mut m = DWRITE_TEXT_METRICS::default();
     let _ = unsafe { layout.GetMetrics(&mut m) };
-    let y = (BAR_HEIGHT - m.height as f64) / 2.0;
+    let y = (bar_height() - m.height as f64) / 2.0;
     unsafe { dc.DrawTextLayout(Vector2 { X: x as f32, Y: y as f32 }, &layout, brush, D2D1_DRAW_TEXT_OPTIONS_NONE) };
 }
 
