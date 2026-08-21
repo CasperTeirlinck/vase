@@ -1,8 +1,10 @@
 //! The Direct2D painter: vase's chrome, drawn in the Fluent idiom.
 
+mod fluent;
 mod gpu;
 mod icons;
 pub(crate) mod paths;
+mod system;
 
 use windows::Win32::Graphics::Direct2D::Common::D2D_RECT_F;
 use windows::Win32::Graphics::Direct2D::{ID2D1Brush, ID2D1DeviceContext, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE, D2D1_INTERPOLATION_MODE_LINEAR, D2D1_ROUNDED_RECT};
@@ -11,7 +13,7 @@ use windows_numerics::Vector2;
 
 use vase_core::chrome::bar::{self, Bar, Hits, Run};
 use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
-use vase_core::chrome::theme::{mark, Role, PANE_PAD, PANE_RADIUS};
+use vase_core::chrome::theme::{mark, style, Role, Style, PANE_PAD, PANE_RADIUS};
 use vase_core::chrome::{bar_height, ListAt, Painter, SwitchRow, FONT_SIZE};
 use vase_core::geometry::{bbox, Rect};
 
@@ -35,21 +37,55 @@ pub struct D2DPainter {
     icons: Icons,
 }
 
+/// A bar laid out in the style the theme names, ready for that style's own painter.
+enum Laid {
+    Fluent(fluent::Strip),
+    Powerline(BarLayout),
+}
+
+impl Laid {
+    fn hits(&self) -> Hits {
+        match self {
+            Laid::Fluent(strip) => strip.hits(),
+            Laid::Powerline(layout) => layout.hits(),
+        }
+    }
+
+    /// The strip alone, for the command line to draw over.
+    fn bare(self) -> Laid {
+        match self {
+            Laid::Fluent(strip) => Laid::Fluent(strip.bare()),
+            Laid::Powerline(layout) => Laid::Powerline(layout.bare()),
+        }
+    }
+}
+
 impl D2DPainter {
     pub fn new() -> windows::core::Result<D2DPainter> {
         let gpu = Gpu::new()?;
         Ok(D2DPainter { bar: Surface::new(&gpu)?, stack_bars: Vec::new(), panes: Surface::new(&gpu)?, focus: Surface::new(&gpu)?, list: Surface::new(&gpu)?, icons: Icons::default(), gpu })
     }
 
-    /// Lay a bar out in the powerline style, against DirectWrite's own text metrics. Windows has no
-    /// native style of its own yet, so `Style::Native` draws this one too.
-    fn lay_out(&self, bar: &Bar) -> BarLayout {
+    /// Lay a bar out in the theme's style, against DirectWrite's own text metrics.
+    fn lay_out(&self, bar: &Bar) -> Laid {
         let measure = |text: &str, size: f64| self.gpu.measure(text, size);
-        powerline::layout(bar, &mark(), &measure)
+        match style() {
+            Style::Native => Laid::Fluent(fluent::layout(bar, &measure)),
+            Style::Powerline => Laid::Powerline(powerline::layout(bar, &mark(), &measure)),
+        }
     }
 
-    /// Paint one laid-out bar into `surface`.
-    fn paint_bar(gpu: &Gpu, icons: &Icons, surface: &mut Surface, layout: &BarLayout) {
+    /// Paint one laid-out bar into `surface`, in the style it was laid out in. `prompt` is the command
+    /// line's text, which goes in the same pass: a second pass over the surface would clear the strip.
+    fn paint_bar(gpu: &Gpu, icons: &Icons, surface: &mut Surface, laid: &Laid, prompt: Option<&str>) {
+        match laid {
+            Laid::Fluent(strip) => fluent::paint(gpu, icons, surface, strip, prompt),
+            Laid::Powerline(layout) => Self::paint_powerline(gpu, icons, surface, layout, prompt),
+        }
+    }
+
+    /// Paint one laid-out powerline bar into `surface`.
+    fn paint_powerline(gpu: &Gpu, icons: &Icons, surface: &mut Surface, layout: &BarLayout, prompt: Option<&str>) {
         let (h, r) = (bar_height(), layout.radius);
         let _ = surface.draw(gpu, layout.rect, |dc| unsafe {
             let factory = &gpu.factory;
@@ -126,6 +162,11 @@ impl D2DPainter {
                     dc.FillEllipse(&ellipse(dot_x + DOT_D / 2.0, h / 2.0, DOT_D / 2.0), &brush);
                 }
             }
+            if let Some(text) = prompt {
+                if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Text), None) {
+                    draw_text(gpu, dc, text, FONT_SIZE, layout.prompt_x(), &brush);
+                }
+            }
         });
     }
 }
@@ -137,23 +178,16 @@ impl Painter for D2DPainter {
 
     fn bar(&mut self, bar: &Bar) -> Hits {
         self.icons.collect(&self.gpu);
-        let layout = self.lay_out(bar);
-        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &layout);
+        let laid = self.lay_out(bar);
+        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &laid, None);
         self.gpu.commit();
-        layout.hits()
+        laid.hits()
     }
 
     fn prompt(&mut self, rect: Rect, text: &str) {
         // The command line owns the bar: the mark stays, the tabs do not.
         let bare = self.lay_out(&Bar { rect, tabs: &[], selected: 0, main: true, armed: false }).bare();
-        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &bare);
-        let x = bare.prompt_x();
-        let gpu = &self.gpu;
-        let _ = self.bar.draw(gpu, bare.rect, |dc| unsafe {
-            if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Text), None) {
-                draw_text(gpu, dc, text, FONT_SIZE, x, &brush);
-            }
-        });
+        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &bare, Some(text));
         self.gpu.commit();
     }
 
@@ -167,15 +201,15 @@ impl Painter for D2DPainter {
             let Ok(surface) = Surface::new(&self.gpu) else { break };
             self.stack_bars.push(surface);
         }
-        let layouts: Vec<BarLayout> = bars.iter().map(|bar| self.lay_out(bar)).collect();
-        for (surface, layout) in self.stack_bars.iter_mut().zip(&layouts) {
-            Self::paint_bar(&self.gpu, &self.icons, surface, layout);
+        let laid: Vec<Laid> = bars.iter().map(|bar| self.lay_out(bar)).collect();
+        for (surface, bar) in self.stack_bars.iter_mut().zip(&laid) {
+            Self::paint_bar(&self.gpu, &self.icons, surface, bar, None);
         }
         for surface in &mut self.stack_bars[bars.len()..] {
             surface.hide();
         }
         self.gpu.commit();
-        layouts.iter().map(BarLayout::hits).collect()
+        laid.iter().map(Laid::hits).collect()
     }
 
     fn panes(&mut self, panes: &[(Rect, bool)]) {
@@ -221,6 +255,7 @@ impl Painter for D2DPainter {
 
     fn list(&mut self, at: ListAt, header: &str, rows: &[SwitchRow], selected: usize) {
         self.icons.collect(&self.gpu);
+        let native = matches!(style(), Style::Native);
         let (area, visible, border_role, border_w) = match at {
             ListAt::Centered(screen) => {
                 // Cap by screen height (less the header row), not a fixed count, so a taller screen shows more.
@@ -256,7 +291,12 @@ impl Painter for D2DPainter {
                 let y = PANE_PAD + ((slot + 1) as f64) * ROW_H;
                 if offset + slot == selected {
                     if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Active), None) {
-                        dc.FillRectangle(&rect_f(1.0, y, area.w - 2.0, ROW_H), &brush);
+                        // Fluent insets a selected row and rounds it; a painted card highlights to its inner edge.
+                        if native {
+                            dc.FillRoundedRectangle(&rounded_row(PANE_PAD / 2.0, y, area.w - PANE_PAD, ROW_H), &brush);
+                        } else {
+                            dc.FillRectangle(&rect_f(1.0, y, area.w - 2.0, ROW_H), &brush);
+                        }
                     }
                 }
                 // The left accent marks the focused window, so it stays marked as the selection moves away.
@@ -324,6 +364,11 @@ impl Painter for D2DPainter {
 
 fn rect_f(x: f64, y: f64, w: f64, h: f64) -> D2D_RECT_F {
     D2D_RECT_F { left: x as f32, top: y as f32, right: (x + w) as f32, bottom: (y + h) as f32 }
+}
+
+/// A list row's highlight, rounded to a Fluent corner.
+fn rounded_row(x: f64, y: f64, w: f64, h: f64) -> D2D1_ROUNDED_RECT {
+    D2D1_ROUNDED_RECT { rect: rect_f(x, y, w, h), radiusX: fluent::CORNER as f32, radiusY: fluent::CORNER as f32 }
 }
 
 fn ellipse(cx: f64, cy: f64, r: f64) -> D2D1_ELLIPSE {

@@ -156,7 +156,17 @@ impl Model {
             let Some(tab) = screen.current_tab() else {
                 continue;
             };
-            collect_stacks(&tab.root, screen.rect, si == self.focused_screen, tab.focused, &mut out);
+            let mut bars = Vec::new();
+            collect_stacks(&tab.root, screen.rect, si == self.focused_screen, tab.focused, &mut bars);
+            // Zoomed, the focused pane covers the screen: the other stacks are behind it, and the
+            // one that is zoomed spans what it now fills rather than the slot it came from.
+            if self.zoomed && si == self.focused_screen {
+                bars.retain(|bar| bar.focused);
+                for bar in &mut bars {
+                    bar.rect = screen.rect;
+                }
+            }
+            out.append(&mut bars);
         }
         out
     }

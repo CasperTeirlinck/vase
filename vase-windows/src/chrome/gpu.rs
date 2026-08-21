@@ -21,12 +21,14 @@ use windows::Win32::Graphics::Dxgi::Common::{DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI
 use windows::Win32::Graphics::Dxgi::{IDXGIDevice, IDXGISurface};
 use windows::Win32::Graphics::Gdi::{CombineRgn, CreateRectRgn, DeleteObject, SetWindowRgn, RGN_DIFF};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, LoadCursorW, RegisterClassW, SetWindowPos, ShowWindow, HWND_TOPMOST, IDC_ARROW, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WNDCLASSW, WS_EX_NOACTIVATE,
-    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, LoadCursorW, RegisterClassW, SetWindowPos, ShowWindow, HWND_TOPMOST, IDC_ARROW, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WM_DWMCOLORIZATIONCOLORCHANGED,
+    WM_SETTINGCHANGE, WM_THEMECHANGED, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
 
-use vase_core::chrome::theme::{palette, Role};
+use vase_core::chrome::theme::{palette, style, Role, Style};
 use vase_core::geometry::Rect;
+
+use super::system;
 
 /// The vase chrome's window class. Registered once; the first `Surface` does it.
 const CLASS: PCWSTR = windows::core::w!("vase_chrome");
@@ -125,9 +127,13 @@ impl Gpu {
     }
 }
 
-/// A color from the active palette, as Direct2D wants it.
+/// A color as Direct2D wants it: from the system's own palette under the native style, from the configured one otherwise.
 pub fn color(role: Role) -> D2D1_COLOR_F {
-    let c = palette().color(role);
+    let c = match style() {
+        Style::Native => system::appearance().palette,
+        Style::Powerline => palette(),
+    }
+    .color(role);
     D2D1_COLOR_F { r: c[0] as f32, g: c[1] as f32, b: c[2] as f32, a: c[3] as f32 }
 }
 
@@ -260,5 +266,10 @@ fn register_class() {
 }
 
 extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: windows::Win32::Foundation::WPARAM, lparam: windows::Win32::Foundation::LPARAM) -> windows::Win32::Foundation::LRESULT {
+    // Windows broadcasts these to every top-level window when the appearance or the accent changes. The chrome
+    // reads the new colors on its next redraw rather than being woken for them.
+    if matches!(msg, WM_SETTINGCHANGE | WM_THEMECHANGED | WM_DWMCOLORIZATIONCOLORCHANGED) {
+        system::invalidate();
+    }
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }

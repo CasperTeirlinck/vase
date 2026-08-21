@@ -8,10 +8,9 @@ favorites = []
 focus_border = false
 
 # Theme: how the chrome is drawn, and the colors it is drawn in.
-# style = "native" (the default) draws the platform's own design language: Liquid Glass on macOS, taking its
-# colors, font, and accent from the system, so the palette below does not apply to it. "powerline" draws vase's
-# own interlocking bar, which the palette does apply to. Windows has no native style yet and draws the
-# powerline one either way.
+# style = "native" (the default) draws the platform's own design language: Liquid Glass on macOS, Fluent on
+# Windows, taking its colors, font, and accent from the system, so the palette below does not apply to it.
+# "powerline" draws vase's own interlocking bar, which the palette does apply to.
 # Built-in palette names: one-dark (default), nord, gruvbox, tokyo-night, catppuccin, fluent-dark, fluent-light.
 # [theme]
 # style = "native"

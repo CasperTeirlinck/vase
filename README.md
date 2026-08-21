@@ -40,9 +40,9 @@ backend crate. macOS and Windows are available today; Linux is planned.
   (tabbed containers) inside a pane, up to two levels deep.
 - **Multi-monitor**: tabs live per display; send a tab to another monitor in
   one keystroke. Layout survives quit/restart and monitor hotplug.
-- **A tab bar that looks like the OS**: macOS Tahoe's Liquid Glass by default, or vase's own powerline style, both
-  with no wasted space, app icons, `prefix-N` numbers for quick switching, dimmed off-monitor tabs, and
-  notification-badge dots.
+- **A tab bar that looks like the OS**: macOS Tahoe's Liquid Glass or Windows 11's Fluent by default, or
+  vase's own powerline style, all with no wasted space, app icons, `prefix-N` numbers for quick switching, dimmed
+  off-monitor tabs, and notification-badge dots.
 - **Window switcher and pane picker**: searchable trees that mirror your layout hierarchy.
 
 ## Install

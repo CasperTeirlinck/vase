@@ -13,8 +13,8 @@ pub const PANE_PAD: f64 = 8.0;
 /// How the chrome is drawn: its shapes, spacing, and material, independent of the palette.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Style {
-    /// The platform's own design language: Liquid Glass on macOS. Platforms without a native style
-    /// of their own draw `Powerline` instead.
+    /// The platform's own design language: Liquid Glass on macOS, Fluent on Windows. Platforms without
+    /// a native style of their own draw `Powerline` instead.
     Native,
     /// vase's own interlocking powerline bar, the same on every platform.
     Powerline,
@@ -178,7 +178,7 @@ const CATPPUCCIN: Palette = Palette {
 };
 
 /// Windows' Fluent palette, so the chrome can read as native there. Greys follow the Fluent neutral ramp.
-const FLUENT_DARK: Palette = Palette {
+pub const FLUENT_DARK: Palette = Palette {
     bg: [0.129, 0.129, 0.129, 1.0],
     active: [0.216, 0.216, 0.216, 1.0],
     dim_bg: [0.102, 0.102, 0.102, 1.0],
@@ -191,7 +191,7 @@ const FLUENT_DARK: Palette = Palette {
 };
 
 /// The only light palette vase ships.
-const FLUENT_LIGHT: Palette = Palette {
+pub const FLUENT_LIGHT: Palette = Palette {
     bg: [0.973, 0.973, 0.973, 1.0],     // SolidBackgroundFillColorBase
     active: [0.902, 0.902, 0.902, 1.0], // ControlFillColorSecondary
     dim_bg: [0.937, 0.937, 0.937, 1.0],
