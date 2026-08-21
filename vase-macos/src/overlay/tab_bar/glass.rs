@@ -61,11 +61,14 @@ impl TabBar {
             }
             // On the accent fill the palette's greys lose their contrast, so those runs take the system's own pairing.
             let text_color = |r: Role| if fill == Some(Role::Active) { active_text(r) } else { role(r) };
+            // A tab's label reads at the same weight as its number here: the icon and the selection
+            // carry the emphasis, not the title.
+            let secondary = |r: Role| if r == Role::Text { Role::Dim } else { r };
 
             for run in &seg.runs {
                 match run {
                     Run::Text { x, text, color } => {
-                        let label = strip_label(self.mtm, &segment(text, &font, &text_color(*color), None), *x);
+                        let label = strip_label(self.mtm, &segment(text, &font, &text_color(secondary(*color)), None), *x);
                         parts.content.addSubview(&label);
                         labels.push(label);
                     }
