@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 (2026-08-23)
+
+### 🚀 Features
+
+- Warp the cursor to the focused pane (prefix-m)
+- Resync command to re-place all windows (menu + prefix Ctrl-R)
+- One-handed picker keys (w/s to move, space to open)
+- Size the centered list by screen height, not a fixed row count
+- Make the focused-pane border configurable, off by default
+- Chrome styles and macOS Liquid Glass (#10)
+- Windows Fluent chrome  style
+
+### 🐛 Bug Fixes
+
+- Follow OS focus across monitors on click
 ## 0.2.0 (2026-08-13)
 
 ### 🚀 Features
