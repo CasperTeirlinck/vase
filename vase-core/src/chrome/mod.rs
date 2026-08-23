@@ -7,14 +7,36 @@ pub mod powerline;
 pub mod theme;
 
 pub use crate::geometry::Rect;
-pub use deck::{Context, Deck};
-pub use paint::{ListAt, Painter, SwitchRow};
+pub use deck::{Click, Context, Deck};
+pub use paint::{BarHits, ListAt, Painter, SwitchRow};
 
 /// Which edge of the main display the tab bar sits on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Position {
     Top,
     Bottom,
+}
+
+/// Which running apps that own no window the tab bar trails behind its tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Windowless {
+    /// None: the bar shows tabs only.
+    Off,
+    /// Only apps that owned a window this session, so the bar stays about windows you opened.
+    Seen,
+    /// Every running app with no window, the way a Dock lists them.
+    All,
+}
+
+impl Windowless {
+    pub fn by_name(name: &str) -> Option<Windowless> {
+        match name.trim().to_lowercase().as_str() {
+            "off" | "false" | "none" => Some(Windowless::Off),
+            "seen" => Some(Windowless::Seen),
+            "all" => Some(Windowless::All),
+            _ => None,
+        }
+    }
 }
 
 /// Height of a bar strip, which the theme's style decides.

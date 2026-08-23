@@ -13,7 +13,7 @@ fn tab(number: usize) -> BarTab {
 
 fn strip(tabs: &[BarTab], main: bool) -> Strip {
     set_theme(Theme { style: Style::Native, ..Theme::DEFAULT });
-    layout(&Bar { rect: Rect::new(0.0, 0.0, 1200.0, bar_height()), tabs, selected: 1, main, armed: false }, &measure)
+    layout(&Bar { rect: Rect::new(0.0, 0.0, 1200.0, bar_height()), tabs, apps: &[], selected: 1, main, armed: false }, &measure)
 }
 
 #[test]

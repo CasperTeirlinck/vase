@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::chrome::theme::{by_name, parse_hex, Mark, Palette, Style, Theme};
-use crate::chrome::Position;
+use crate::chrome::{Position, Windowless};
 use crate::input::{Key, KeyCode, Mods};
 
 pub const DEFAULT: &str = include_str!("../../docs/vase.example.toml");
@@ -21,13 +21,15 @@ pub struct Config {
     pub mark: Mark,
     /// `None` leaves the edge to the platform, whose OS furniture decides which one is free.
     pub bar_position: Option<Position>,
+    /// Which running apps with no window the bar trails behind its tabs.
+    pub windowless: Windowless,
     /// Draw the accent outline around the focused pane of a split tab; off by default.
     pub focus_border: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: Theme::DEFAULT, mark: Mark::Logo, bar_position: None, focus_border: false }
+        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: Theme::DEFAULT, mark: Mark::Logo, bar_position: None, windowless: Windowless::Seen, focus_border: false }
     }
 }
 
@@ -48,8 +50,8 @@ impl Config {
             }
         };
         let RawConfig { app_focus, favorites, theme, tabbar, focus_border } = raw;
-        let (mark, bar_position) = tabbar.resolve();
-        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position, focus_border }
+        let (mark, bar_position, windowless) = tabbar.resolve();
+        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position, windowless, focus_border }
     }
 
     pub fn ensure(path: &Path) {
@@ -166,10 +168,11 @@ impl RawTheme {
 struct RawTabbar {
     mark: Option<String>,
     position: Option<String>,
+    windowless: Option<String>,
 }
 
 impl RawTabbar {
-    fn resolve(self) -> (Mark, Option<Position>) {
+    fn resolve(self) -> (Mark, Option<Position>, Windowless) {
         let mark = match self.mark.as_deref() {
             None | Some("vase") => Mark::Logo,
             Some("") => Mark::Hidden,
@@ -184,7 +187,14 @@ impl RawTabbar {
                 None
             }
         };
-        (mark, position)
+        let windowless = match self.windowless.as_deref() {
+            None => Windowless::Seen,
+            Some(name) => Windowless::by_name(name).unwrap_or_else(|| {
+                eprintln!("vase: config: unrecognized tabbar windowless {name:?}; showing the apps seen this session");
+                Windowless::Seen
+            }),
+        };
+        (mark, position, windowless)
     }
 }
 

@@ -18,6 +18,9 @@ pub struct Bar<'a> {
     pub rect: Rect,
     pub tabs: &'a [BarTab],
     pub selected: usize,
+    /// Running apps with no window of their own, trailing the tabs as bare icons. Only the screen's
+    /// tab bar carries them.
+    pub apps: &'a [String],
     /// The screen's tab bar, which carries the mark and the prefix indicator. A stack bar carries neither.
     pub main: bool,
     /// The prefix chord is armed.
@@ -119,6 +122,12 @@ fn ellipsize(text: &str, max: f64, measure: Measure) -> String {
         }
     }
     chars[..lo].iter().chain(std::iter::once(&'…')).collect()
+}
+
+/// Each trailing app icon's x, in order, the cluster right-aligned to end at `right`.
+pub fn app_icons(count: usize, right: f64, icon: f64, gap: f64) -> Vec<f64> {
+    let left = right - count as f64 * (icon + gap) + gap;
+    (0..count).map(|i| left + i as f64 * (icon + gap)).collect()
 }
 
 /// A picker row's leading marker.

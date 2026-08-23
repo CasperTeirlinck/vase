@@ -60,6 +60,18 @@ pub trait Backend {
         HashSet::new()
     }
 
+    /// Display names of the apps the OS reports as running, window or not: what a Dock or a taskbar
+    /// draws. Empty where the platform keeps no such list.
+    fn running_apps(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Bring an already-running `app` forward, letting it open a window if it has none, the way
+    /// clicking its Dock or taskbar icon does.
+    fn activate(&self, app: &str) {
+        self.launch(app);
+    }
+
     /// Which edge the tab bar takes when the config names none.
     fn default_bar_position(&self) -> Position {
         Position::Bottom

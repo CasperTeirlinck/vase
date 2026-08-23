@@ -59,8 +59,10 @@ pub struct BarLayout {
     pub dot: Option<(f64, bool)>,
     /// Radius of every notch and bulge. A full semicircle, so tab ends run full height.
     pub radius: f64,
-    /// Content past this x is clipped, so tabs never reach the prefix dot.
+    /// Content past this x is clipped, so tabs never reach the trailing icons or the prefix dot.
     pub content_w: f64,
+    /// x of each trailing windowless-app icon, `TAB_ICON` wide.
+    pub apps: Vec<f64>,
 }
 
 impl BarLayout {
@@ -70,9 +72,14 @@ impl BarLayout {
         self.tabs.iter().map(|t| (t.x0 + self.radius, t.x1 + self.radius)).collect()
     }
 
+    /// Each trailing icon's clickable span.
+    pub fn app_hits(&self) -> Hits {
+        self.apps.iter().map(|x| (*x, x + TAB_ICON)).collect()
+    }
+
     /// The strip alone, for the command line to draw the mark over.
     pub fn bare(&self) -> BarLayout {
-        BarLayout { rect: self.rect, lead: self.lead.clone(), tabs: Vec::new(), dot: None, radius: self.radius, content_w: self.content_w }
+        BarLayout { rect: self.rect, lead: self.lead.clone(), tabs: Vec::new(), dot: None, radius: self.radius, content_w: self.content_w, apps: Vec::new() }
     }
 
     /// Where the command line's text starts: clear of the pill's convex bulge, plus a gap.
@@ -86,7 +93,10 @@ pub fn layout(bar: &Bar, mark: &Mark, measure: Measure) -> BarLayout {
     let h = bar_height();
     let radius = h / 2.0;
     let dot_x = bar.rect.w - DOT_D - DOT_PAD;
-    let content_w = if bar.main { (dot_x - DOT_PAD).max(0.0) } else { bar.rect.w };
+    // Windowless apps trail the tabs as bare icons, between the last tab and the prefix dot.
+    let apps = if bar.main { bar::app_icons(bar.apps.len(), dot_x - DOT_PAD, TAB_ICON, TAB_ICON_GAP) } else { Vec::new() };
+    let content_end = apps.first().copied().unwrap_or(dot_x) - DOT_PAD;
+    let content_w = if bar.main { content_end.max(0.0) } else { bar.rect.w };
     // No leading pill on a stack bar, or when the mark is hidden: the first tab caps at the strip's
     // rounded corner instead of nesting into a pill.
     let lead = if bar.main { lead_pill(mark, measure) } else { None };
@@ -121,7 +131,7 @@ pub fn layout(bar: &Bar, mark: &Mark, measure: Measure) -> BarLayout {
         })
         .collect();
 
-    BarLayout { rect: bar.rect, lead, tabs: shapes, dot: bar.main.then_some((dot_x, bar.armed)), radius, content_w }
+    BarLayout { rect: bar.rect, lead, tabs: shapes, dot: bar.main.then_some((dot_x, bar.armed)), radius, content_w, apps }
 }
 
 fn metrics(content_left: f64) -> Metrics {

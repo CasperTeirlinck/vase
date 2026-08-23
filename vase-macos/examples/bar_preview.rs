@@ -29,12 +29,12 @@ fn main() {
         BarTab { off_workspace: true, dim: true, ..tab(4, "Mail", "Inbox") },
         BarTab { hotkey: true, badges: vec![true], ..tab(5, "Slack", "dataminded") },
     ];
-    for t in &tabs {
-        for app in &t.icons {
-            painter.prewarm_icon(app);
-        }
+    // Apps running with no window of their own, drawn as bare icons after the last tab.
+    let windowless: Vec<String> = ["Notes".into(), "Music".into(), "Preview".into()].into();
+    for app in tabs.iter().flat_map(|t| &t.icons).chain(&windowless) {
+        painter.prewarm_icon(app);
     }
-    painter.bar(&Bar { rect: Rect::new(0.0, 300.0, 1200.0, bar_height()), tabs: &tabs, selected: 1, main: true, armed: false });
+    painter.bar(&Bar { rect: Rect::new(0.0, 300.0, 1200.0, bar_height()), tabs: &tabs, apps: &windowless, selected: 1, main: true, armed: false });
 
     let rows: Vec<SwitchRow> = tabs.iter().map(row).collect();
     // Centered below the bar, so the two surfaces can be looked at (or screenshot) together.

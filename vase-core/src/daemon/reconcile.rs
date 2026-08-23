@@ -8,7 +8,7 @@ use crate::model::{Command, Effect, Screen, Tab};
 use crate::tree::WindowId;
 
 use super::Daemon;
-use crate::chrome::Painter;
+use crate::chrome::{Painter, Windowless};
 
 impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Pull each managed window's current title via Accessibility; returns whether any changed.
@@ -26,6 +26,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Take a new window under management and give it a home in the layout.
     fn adopt(&mut self, w: &WindowInfo) {
         self.windows.adopt(w, false);
+        self.seen_apps.insert(w.app.clone());
         // Warm this window's app icon so its tab shows it right away.
         self.chrome.prewarm_icon(&w.app);
         // A pending launch's window fills the focused empty pane instead of opening a new tab.
@@ -117,7 +118,10 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Diff live manageable windows against the model: adopt new, remove closed.
     pub fn reconcile(&mut self) {
         self.reconcile_screens();
-        let current: Vec<_> = self.backend.list_windows().into_iter().filter(manageable).collect();
+        let onscreen = self.backend.list_windows();
+        // Every app with a window on screen, tileable or not: none of them is windowless.
+        let windowed: HashSet<String> = onscreen.iter().map(|w| w.app.clone()).collect();
+        let current: Vec<_> = onscreen.into_iter().filter(manageable).collect();
         let current_ids: HashSet<WindowId> = current.iter().map(|w| w.id).collect();
         let model_ids: Vec<WindowId> = self.model.as_ref().unwrap().all_windows();
         let model_set: HashSet<WindowId> = model_ids.iter().copied().collect();
@@ -207,19 +211,34 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             }
         }
 
-        self.refresh_badges();
+        self.refresh_app_state(&windowed);
     }
 
-    /// Poll the Dock for notification badges (throttled) and redraw bars on a change.
-    fn refresh_badges(&mut self) {
+    /// Poll what the OS knows about apps (throttled): notification badges, and the apps running with
+    /// no window. Redraws the bars on a change.
+    fn refresh_app_state(&mut self, windowed: &HashSet<String>) {
         self.badge_tick = self.badge_tick.wrapping_add(1);
         if !self.badge_tick.is_multiple_of(5) {
             return; // ~every 5th reconcile (~500 ms)
         }
         let badges = self.backend.badged_apps();
-        if badges != self.badges {
+        let windowless = self.windowless_apps(windowed);
+        if badges != self.badges || windowless != self.windowless {
             self.badges = badges;
+            self.windowless = windowless;
             self.refresh();
         }
+    }
+
+    /// The running apps with no window at all, in the OS's own order. `windowed` names the apps with
+    /// one on screen; an adopted window that is minimized or on another workspace counts too, so an
+    /// app is never both a tab and a trailing icon.
+    fn windowless_apps(&self, windowed: &HashSet<String>) -> Vec<String> {
+        if self.windowless_policy == Windowless::Off {
+            return Vec::new();
+        }
+        let adopted: HashSet<&str> = self.windows.iter().map(|(_, w)| w.app.as_str()).collect();
+        let listed = |app: &String| self.windowless_policy == Windowless::All || self.seen_apps.contains(app);
+        self.backend.running_apps().into_iter().filter(|app| !windowed.contains(app) && !adopted.contains(app.as_str())).filter(listed).collect()
     }
 }

@@ -42,7 +42,8 @@ backend crate. macOS and Windows are available today; Linux is planned.
   one keystroke. Layout survives quit/restart and monitor hotplug.
 - **A tab bar that looks like the OS**: macOS Tahoe's Liquid Glass or Windows 11's Fluent by default, or
   vase's own powerline style, all with no wasted space, app icons, `prefix-N` numbers for quick switching, dimmed
-  off-monitor tabs, and notification-badge dots.
+  off-monitor tabs, and notification-badge dots. Apps still running with no window trail the tabs as bare icons,
+  like a Dock.
 - **Window switcher and pane picker**: searchable trees that mirror your layout hierarchy.
 
 ## Install

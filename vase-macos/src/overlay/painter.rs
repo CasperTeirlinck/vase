@@ -2,6 +2,7 @@
 
 use objc2::MainThreadMarker;
 use vase_core::chrome::bar::{Bar, Hits};
+use vase_core::chrome::BarHits;
 use vase_core::chrome::{ListAt, Painter, SwitchRow};
 use vase_core::geometry::Rect;
 
@@ -31,7 +32,7 @@ impl Painter for AppKitPainter {
         super::text::measure(text, size)
     }
 
-    fn bar(&mut self, bar: &Bar) -> Hits {
+    fn bar(&mut self, bar: &Bar) -> BarHits {
         self.bar.show(bar)
     }
 
@@ -47,7 +48,8 @@ impl Painter for AppKitPainter {
         while self.stack_bars.len() < bars.len() {
             self.stack_bars.push(TabBar::new(self.mtm));
         }
-        let hits = self.stack_bars.iter_mut().zip(bars).map(|(surface, bar)| surface.show(bar)).collect();
+        // A stack bar carries no trailing icons, so only its tab spans can be clicked.
+        let hits = self.stack_bars.iter_mut().zip(bars).map(|(surface, bar)| surface.show(bar).tabs).collect();
         for surface in &self.stack_bars[bars.len()..] {
             surface.hide();
         }

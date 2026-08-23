@@ -20,9 +20,13 @@ fn strip() -> Rect {
 }
 
 fn lay(tabs: &[BarTab], selected: usize, main: bool, mark: &Mark) -> BarLayout {
+    lay_with(tabs, selected, main, mark, &[])
+}
+
+fn lay_with(tabs: &[BarTab], selected: usize, main: bool, mark: &Mark, apps: &[String]) -> BarLayout {
     // Lay out against the powerline style's own strip, whatever the default theme is.
     set_theme(Theme { style: Style::Powerline, ..Theme::DEFAULT });
-    layout(&Bar { rect: strip(), tabs, selected, main, armed: false }, mark, &measure)
+    layout(&Bar { rect: strip(), tabs, apps, selected, main, armed: false }, mark, &measure)
 }
 
 #[test]
@@ -154,4 +158,23 @@ fn a_user_glyph_sizes_its_own_slot_and_the_logo_uses_a_fixed_one() {
     assert!(wide.width > logo.width);
     let LeadGlyph::Glyph { x, .. } = wide.glyph else { panic!("a glyph mark draws as text") };
     assert!(x > 0.0 && x < wide.width);
+}
+
+#[test]
+fn trailing_app_icons_take_their_room_from_the_tabs() {
+    let tabs = [tab(1, "one")];
+    let apps: Vec<String> = vec!["Notes".into(), "Music".into()];
+    let bare = lay(&tabs, 0, true, &Mark::Logo);
+    let trailed = lay_with(&tabs, 0, true, &Mark::Logo, &apps);
+
+    // Two icons, left to right, ending before the prefix dot, each one clickable.
+    assert_eq!(trailed.apps.len(), 2);
+    assert!(trailed.apps[0] < trailed.apps[1]);
+    let (_, last) = *trailed.app_hits().last().unwrap();
+    assert!(last < trailed.dot.unwrap().0, "the icons stop short of the dot");
+    // The tabs' clip shrinks to make room, and the tabs themselves are laid out the same.
+    assert!(trailed.content_w < bare.content_w);
+    assert_eq!(trailed.tabs, bare.tabs);
+    // A stack bar carries none.
+    assert!(lay_with(&tabs, 0, false, &Mark::Logo, &apps).apps.is_empty());
 }

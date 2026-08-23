@@ -4,6 +4,14 @@ use crate::geometry::Rect;
 
 use super::bar::{Bar, Hits};
 
+/// Where a drawn tab bar's clickable pieces landed.
+#[derive(Default)]
+pub struct BarHits {
+    pub tabs: Hits,
+    /// The trailing windowless-app icons, in the order they were given.
+    pub apps: Hits,
+}
+
 /// One row of a list.
 pub struct SwitchRow {
     pub number: usize,
@@ -39,8 +47,8 @@ pub trait Painter {
     /// Width of `text` at `size` points, in the font this painter draws bar and list text in.
     fn measure(&self, text: &str, size: f64) -> f64;
 
-    /// Draw the screen's tab bar, returning each tab's clickable span.
-    fn bar(&mut self, bar: &Bar) -> Hits;
+    /// Draw the screen's tab bar, returning where its clickable pieces landed.
+    fn bar(&mut self, bar: &Bar) -> BarHits;
 
     /// Draw the bar as a command line rather than tabs: the strip and the leading mark, then `text`.
     fn prompt(&mut self, rect: Rect, text: &str);

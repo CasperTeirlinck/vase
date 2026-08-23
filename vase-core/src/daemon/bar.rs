@@ -7,7 +7,7 @@ use crate::model::Command;
 
 use super::Daemon;
 use crate::backend::Backend;
-use crate::chrome::Painter;
+use crate::chrome::{Click, Painter};
 
 impl<B: Backend, C: Painter> Daemon<B, C> {
     fn total_tabs(&self) -> usize {
@@ -75,8 +75,14 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     pub fn click(&mut self, px: f64, py: f64) -> bool {
         let Some(model) = &self.model else { return false };
         match self.chrome.hit(model, px, py) {
-            Some(cmd) => {
+            Some(Click::Command(cmd)) => {
                 self.dispatch(cmd);
+                true
+            }
+            // A windowless app has nothing to raise, so the OS is asked to front it; whatever window
+            // it opens then lands as a new tab.
+            Some(Click::Activate(app)) => {
+                self.backend.activate(&app);
                 true
             }
             None => false,

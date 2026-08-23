@@ -20,6 +20,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         self.app_hotkeys = config.app_focus;
         self.favorites = config.favorites;
         self.focus_border = config.focus_border;
+        self.windowless_policy = config.windowless;
         let strip = crate::chrome::bar_height();
         crate::chrome::theme::set_theme(config.theme);
         crate::chrome::theme::set_mark(config.mark);
@@ -60,8 +61,11 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             return;
         }
         let first = model.all_windows().into_iter().find(|id| app_matches(self.windows.app(*id), app));
-        if let Some(id) = first {
-            self.dispatch(Command::Raise(id));
+        match first {
+            Some(id) => self.dispatch(Command::Raise(id)),
+            // Running but windowless (or not started at all): let the OS front it, and the window it
+            // opens lands as a new tab.
+            None => self.backend.activate(app),
         }
     }
 }

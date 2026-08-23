@@ -7,7 +7,18 @@ use accessibility_sys::{kAXErrorSuccess, AXUIElementCopyAttributeValue, AXUIElem
 use core_foundation::array::CFArray;
 use core_foundation::base::{CFRelease, CFType, CFTypeRef, TCFType};
 use core_foundation::string::CFString;
-use objc2_app_kit::NSWorkspace;
+use objc2_app_kit::{NSApplicationActivationPolicy, NSWorkspace};
+
+/// Display names of every running app the Dock lists: the ones with a regular activation policy, so
+/// agents and background processes are left out.
+pub fn running_apps() -> Vec<String> {
+    NSWorkspace::sharedWorkspace()
+        .runningApplications()
+        .iter()
+        .filter(|app| app.activationPolicy() == NSApplicationActivationPolicy::Regular)
+        .filter_map(|app| app.localizedName().map(|n| n.to_string()))
+        .collect()
+}
 
 /// Display names of apps whose Dock icon currently carries a badge.
 pub fn badged_apps() -> HashSet<String> {

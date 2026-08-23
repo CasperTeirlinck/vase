@@ -3,15 +3,17 @@
 use objc2::rc::Retained;
 use objc2::MainThreadMarker;
 use objc2::MainThreadOnly;
-use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBox, NSBoxType, NSTextField, NSTitlePosition, NSView};
+use objc2_app_kit::{NSAttributedStringNSStringDrawing, NSBox, NSBoxType, NSImageScaling, NSImageView, NSTextField, NSTitlePosition, NSView};
 use objc2_foundation::{NSAttributedString, NSPoint, NSRect, NSSize, NSString};
 use objc2_quartz_core::CALayer;
 use vase_core::chrome::bar::{Bar, Hits};
 use vase_core::chrome::theme::{style, Style};
+use vase_core::chrome::BarHits;
 use vase_core::geometry::Rect;
 
 use super::bar_height;
 use super::panel::Panel;
+use super::text::app_icon;
 use super::theme::{accent, badge_red, dim_col};
 
 mod glass;
@@ -39,8 +41,8 @@ impl TabBar {
         TabBar { panel: Panel::new(mtm), labels: Vec::new(), mtm }
     }
 
-    /// Draw `bar`, returning each tab's clickable span.
-    pub fn show(&mut self, bar: &Bar) -> Hits {
+    /// Draw `bar`, returning where its clickable pieces landed.
+    pub fn show(&mut self, bar: &Bar) -> BarHits {
         match style() {
             Style::Native => self.show_glass(bar),
             Style::Powerline => self.show_powerline(bar),
@@ -80,6 +82,21 @@ fn prompt_label(mtm: MainThreadMarker, text: &NSAttributedString, x: f64, strip_
     let th = text.size().height;
     label.setFrame(NSRect::new(NSPoint::new(x, (bar_height() - th) / 2.0 + 2.0), NSSize::new((strip_w - x - 8.0).max(0.0), th)));
     label
+}
+
+/// The trailing windowless-app icons: `apps[i]` drawn at `xs[i]`, `size` square and centered in the
+/// strip. Every span comes back whether its icon resolved or not, so a cold icon cache cannot move
+/// the click targets.
+fn app_icons(mtm: MainThreadMarker, parent: &NSView, xs: &[f64], apps: &[String], size: f64) -> Hits {
+    let y = (bar_height() - size) / 2.0;
+    for (x, app) in xs.iter().zip(apps) {
+        let Some(img) = app_icon(app) else { continue };
+        let view = NSImageView::initWithFrame(NSImageView::alloc(mtm), NSRect::new(NSPoint::new(*x, y), NSSize::new(size, size)));
+        view.setImage(Some(&img));
+        view.setImageScaling(NSImageScaling::ScaleProportionallyUpOrDown);
+        parent.addSubview(&view);
+    }
+    xs.iter().map(|x| (*x, x + size)).collect()
 }
 
 /// A view clipped to `width`, and its layer: everything past the strip's content width is cut off.

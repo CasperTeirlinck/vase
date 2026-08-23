@@ -27,9 +27,13 @@ focus_border = false
 
 # Tab-bar leading mark: "vase" (the logo, default), "" to hide it (the first tab then caps like a stack), or any glyph.
 # Position: "top" or "bottom".
+# Windowless: apps that are running but own no window, drawn as bare icons after the last tab (click one to bring the
+# app back, the way its Dock icon does). "seen" (default) shows only apps whose window you closed this session, "all"
+# lists every running app without a window, "off" shows none. Windows keeps no such list, so nothing is drawn there.
 # [tabbar]
 # mark = "vase"
 # position = "top"
+# windowless = "seen"
 
 # A global hotkey that toggles focus to an app: press the chord to bring it forward, press again to hide it.
 # Add one [[app_focus]] block per app.

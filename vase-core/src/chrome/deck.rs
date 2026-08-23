@@ -14,11 +14,27 @@ use crate::registry::{app_matches, clean_title, Registry};
 use crate::tree::WindowId;
 
 use super::bar::{Bar, BarTab, Hits};
-use super::paint::{ListAt, Painter, SwitchRow};
+use super::paint::{BarHits, ListAt, Painter, SwitchRow};
 use super::Position;
 
-/// A drawn bar's click map: its rect, per-tab hit ranges, and what each range selects.
+/// A drawn stack bar's click map: its rect, per-item hit ranges, and what each range selects.
 pub(crate) type ClickMap = (Rect, Hits, Vec<WindowId>);
+
+/// The drawn tab bar's click map: its rect, where its pieces landed, and the apps its trailing icons stand for.
+pub(crate) struct BarMap {
+    pub rect: Rect,
+    pub hits: BarHits,
+    pub apps: Vec<String>,
+}
+
+/// What a click on the chrome asks for.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Click {
+    /// A model edit: selecting a tab or a stack item.
+    Command(Command),
+    /// A trailing icon: bring that windowless app back.
+    Activate(String),
+}
 
 /// What the chrome needs on top of the model to draw a frame.
 pub struct Context<'a> {
@@ -29,6 +45,8 @@ pub struct Context<'a> {
     pub off_workspace: &'a HashSet<WindowId>,
     /// Apps with a focus-toggle hotkey; their tabs get a marker.
     pub hotkeys: &'a [AppFocus],
+    /// Running apps with no window, drawn as bare icons after the last tab.
+    pub windowless: &'a [String],
     /// Display the tab bar lives on.
     pub main_screen: usize,
     /// Edge of that display the tab bar sits on.
@@ -44,14 +62,14 @@ pub struct Context<'a> {
 
 pub struct Deck<C: Painter> {
     painter: C,
-    /// Hit ranges from the last `sync`, in the order the bars were drawn.
-    bar_hits: Option<(Rect, Hits)>,
+    /// Click maps from the last `sync`, in the order the bars were drawn.
+    bar_map: Option<BarMap>,
     stack_hits: Vec<ClickMap>,
 }
 
 impl<C: Painter> Deck<C> {
     pub fn new(painter: C) -> Deck<C> {
-        Deck { painter, bar_hits: None, stack_hits: Vec::new() }
+        Deck { painter, bar_map: None, stack_hits: Vec::new() }
     }
 
     /// Redraw every surface from the model. Nothing else may draw them.
@@ -62,9 +80,9 @@ impl<C: Painter> Deck<C> {
         self.sync_focus_border(model, ctx);
     }
 
-    /// The command a click resolves to, against the click maps left by the last `sync`.
-    pub fn hit(&self, model: &Model, px: f64, py: f64) -> Option<Command> {
-        route_click(model, self.bar_hits.as_ref(), &self.stack_hits, px, py)
+    /// What a click resolves to, against the click maps left by the last `sync`.
+    pub fn hit(&self, model: &Model, px: f64, py: f64) -> Option<Click> {
+        route_click(model, self.bar_map.as_ref(), &self.stack_hits, px, py)
     }
 
     pub fn list(&mut self, at: ListAt, header: &str, rows: &[SwitchRow], selected: usize) {
@@ -99,13 +117,13 @@ impl<C: Painter> Deck<C> {
         // While the command line is open it owns the bar; no tabs, and no click targets.
         if let Some(line) = &ctx.prompt {
             self.painter.prompt(bar_rect, line);
-            self.bar_hits = None;
+            self.bar_map = None;
             return;
         }
         let (tabs, selected) = model.bar_tabs();
         if tabs.is_empty() {
             self.painter.hide_bar();
-            self.bar_hits = None;
+            self.bar_map = None;
             return;
         }
         let bar_tabs: Vec<BarTab> = tabs
@@ -135,8 +153,9 @@ impl<C: Painter> Deck<C> {
                 BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, off_workspace, hotkey }
             })
             .collect();
-        let bar = Bar { rect: bar_rect, tabs: &bar_tabs, selected, main: true, armed: ctx.prefix_armed };
-        self.bar_hits = Some((bar_rect, self.painter.bar(&bar)));
+        let bar = Bar { rect: bar_rect, tabs: &bar_tabs, apps: ctx.windowless, selected, main: true, armed: ctx.prefix_armed };
+        let hits = self.painter.bar(&bar);
+        self.bar_map = Some(BarMap { rect: bar_rect, hits, apps: ctx.windowless.to_vec() });
     }
 
     fn sync_stack_bars(&mut self, model: &Model, ctx: &Context) {
@@ -171,7 +190,7 @@ impl<C: Painter> Deck<C> {
                 (Rect::new(stack.rect.x, stack.rect.y, stack.rect.w, super::bar_height()), tabs, stack.selected)
             })
             .collect();
-        let strips: Vec<Bar> = bars.iter().map(|(rect, tabs, selected)| Bar { rect: *rect, tabs, selected: *selected, main: false, armed: false }).collect();
+        let strips: Vec<Bar> = bars.iter().map(|(rect, tabs, selected)| Bar { rect: *rect, tabs, apps: &[], selected: *selected, main: false, armed: false }).collect();
         let hits = self.painter.stack_bars(&strips);
         self.stack_hits = strips.iter().zip(hits).zip(&stacks).map(|((strip, hits), stack)| (strip.rect, hits, stack.items.clone())).collect();
     }
@@ -190,17 +209,20 @@ impl<C: Painter> Deck<C> {
 }
 
 /// Free of `Deck` so the routing arithmetic is testable without a painter.
-pub(crate) fn route_click(model: &Model, bar: Option<&(Rect, Vec<(f64, f64)>)>, stacks: &[ClickMap], px: f64, py: f64) -> Option<Command> {
+pub(crate) fn route_click(model: &Model, bar: Option<&BarMap>, stacks: &[ClickMap], px: f64, py: f64) -> Option<Click> {
     // A stack bar is drawn over the tab it belongs to, so it gets first refusal.
     for (rect, ranges, ids) in stacks {
         if let Some(id) = hit_range(*rect, ranges, px, py).and_then(|i| ids.get(i).copied()) {
-            return Some(Command::SelectStackWindow(id));
+            return Some(Click::Command(Command::SelectStackWindow(id)));
         }
     }
-    let (rect, ranges) = bar?;
-    let flat = hit_range(*rect, ranges, px, py)?;
-    let (si, ti) = model.screen_tab(flat)?;
-    Some(Command::SelectScreenTab(si, ti))
+    let bar = bar?;
+    if let Some(flat) = hit_range(bar.rect, &bar.hits.tabs, px, py) {
+        let (si, ti) = model.screen_tab(flat)?;
+        return Some(Click::Command(Command::SelectScreenTab(si, ti)));
+    }
+    let app = hit_range(bar.rect, &bar.hits.apps, px, py).and_then(|i| bar.apps.get(i))?;
+    Some(Click::Activate(app.clone()))
 }
 
 /// Index of the horizontal range a point falls in, if the point is inside `rect` at all.

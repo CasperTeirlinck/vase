@@ -42,7 +42,7 @@ fn main() {
     }
     // The icons resolve on a worker thread, so the first draw waits for it rather than showing gaps.
     sleep(Duration::from_millis(750));
-    painter.bar(&Bar { rect: Rect::new(screen.x, screen.y, screen.w, bar_height()), tabs: &tabs, selected: 1, main: true, armed: false });
+    painter.bar(&Bar { rect: Rect::new(screen.x, screen.y, screen.w, bar_height()), tabs: &tabs, apps: &[], selected: 1, main: true, armed: false });
 
     let rows: Vec<SwitchRow> = tabs.iter().map(row).collect();
     painter.list(ListAt::Centered(screen), "switch to: flu", &rows, 1);

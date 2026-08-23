@@ -7,13 +7,14 @@ use objc2_foundation::{NSPoint, NSRect, NSSize};
 use objc2_quartz_core::CAShapeLayer;
 use vase_core::chrome::bar::{self, Bar, BarTab, Hits, Measure, Metrics, Run};
 use vase_core::chrome::theme::{mark, vase_mark, Mark, Role};
+use vase_core::chrome::BarHits;
 use vase_core::geometry::Rect;
 
 use super::super::glass::backdrop;
 use super::super::text::{app_icon, chrome_font, measure, segment};
 use super::super::theme::{accent, active_text, role, text_col, vase_mark_bezier};
 use super::super::{bar_height, FONT_SIZE};
-use super::{badge_dot, clipped_content, prefix_dot, prompt_label, strip_label, Parts, TabBar};
+use super::{app_icons, badge_dot, clipped_content, prefix_dot, prompt_label, strip_label, Parts, TabBar};
 
 /// Inset of the floating strip inside the reserved rect, on both sides.
 const INSET: f64 = 8.0;
@@ -36,10 +37,14 @@ const MAX_LABEL: f64 = 140.0;
 const DOT_D: f64 = 7.0;
 
 impl TabBar {
-    pub(super) fn show_glass(&mut self, bar: &Bar) -> Hits {
+    pub(super) fn show_glass(&mut self, bar: &Bar) -> BarHits {
         let dot_x = bar.rect.w - INSET - PAD - DOT_D;
-        // Tabs stop short of the prefix dot; a stack bar carries none, so its content runs to the strip's end.
-        let content_w = if bar.main { dot_x - INSET - PAD } else { bar.rect.w - 2.0 * INSET - PAD };
+        // Windowless apps trail the tabs as bare icons, between the last tab and the prefix dot. Both
+        // sit in the panel's own coordinates, outside the strip-local content view.
+        let icons = bar::app_icons(bar.apps.len(), dot_x - PAD, ICON, ICON_GAP);
+        let content_end = icons.first().copied().unwrap_or(dot_x);
+        // Tabs stop short of whatever trails them; a stack bar has neither, so its content runs to the strip's end.
+        let content_w = if bar.main { content_end - INSET - PAD } else { bar.rect.w - 2.0 * INSET - PAD };
         let (parts, left) = self.begin_glass(bar.rect, content_w, bar.main);
         let font = chrome_font(FONT_SIZE);
         let mut labels: Vec<Retained<NSTextField>> = parts.glyph.into_iter().collect();
@@ -90,12 +95,13 @@ impl TabBar {
             }
         }
 
+        let apps = app_icons(self.mtm, &parts.container, &icons, bar.apps, ICON);
         if bar.main {
             parts.container.addSubview(&prefix_dot(self.mtm, dot_x, DOT_D, bar.armed));
         }
         self.panel.show(&parts.container);
         self.labels = labels;
-        hits(&segments)
+        BarHits { tabs: hits(&segments), apps }
     }
 
     pub(super) fn prompt_glass(&mut self, rect: Rect, prompt: &str) {

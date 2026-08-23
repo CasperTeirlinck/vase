@@ -5,19 +5,20 @@ use objc2::MainThreadOnly;
 use objc2_app_kit::{NSBezierPath, NSImageScaling, NSImageView, NSTextField, NSView};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use objc2_quartz_core::{CALayer, CAShapeLayer};
-use vase_core::chrome::bar::{Bar, Hits, Run};
+use vase_core::chrome::bar::{Bar, Run};
 use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
 use vase_core::chrome::theme::mark;
+use vase_core::chrome::BarHits;
 use vase_core::geometry::Rect;
 
 use super::super::text::{app_icon, chrome_font, measure, segment};
 use super::super::theme::*;
 use super::super::{bar_height, FONT_SIZE};
-use super::{badge_dot, clipped_content, prefix_dot, prompt_label, strip_label, Parts, TabBar};
+use super::{app_icons, badge_dot, clipped_content, prefix_dot, prompt_label, strip_label, Parts, TabBar};
 
 impl TabBar {
     /// Stroke a laid-out bar. Every position comes from the layout; this only turns it into AppKit.
-    pub(super) fn show_powerline(&mut self, bar: &Bar) -> Hits {
+    pub(super) fn show_powerline(&mut self, bar: &Bar) -> BarHits {
         let layout = powerline::layout(bar, &mark(), &measure);
         let parts = self.begin_powerline(&layout, layout.content_w);
         let scale = self.panel.scale();
@@ -75,17 +76,19 @@ impl TabBar {
             outline.setLineWidth(1.5);
             parts.layer.addSublayer(&outline);
         }
+        // Outside the clipped content view: the trailing icons and the dot sit past where tabs stop.
+        let apps = app_icons(self.mtm, &parts.container, &layout.apps, bar.apps, TAB_ICON);
         if let Some((dot_x, armed)) = layout.dot {
             parts.container.addSubview(&prefix_dot(self.mtm, dot_x, DOT_D, armed));
         }
 
         self.panel.show(&parts.container);
         self.labels = labels;
-        layout.hits()
+        BarHits { tabs: layout.hits(), apps }
     }
 
     pub(super) fn prompt_powerline(&mut self, rect: Rect, prompt: &str) {
-        let bar = Bar { rect, tabs: &[], selected: 0, main: true, armed: false };
+        let bar = Bar { rect, tabs: &[], apps: &[], selected: 0, main: true, armed: false };
         let layout = powerline::layout(&bar, &mark(), &measure).bare();
         // Full width: the command line has no prefix dot to avoid.
         let parts = self.begin_powerline(&layout, rect.w);

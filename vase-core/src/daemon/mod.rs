@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::backend::Backend;
-use crate::chrome::{Context, Deck, Painter, Position};
+use crate::chrome::{Context, Deck, Painter, Position, Windowless};
 use crate::config::{AppFocus, Config};
 use crate::geometry::Rect;
 use crate::input::{NumberEntry, Switcher};
@@ -55,6 +55,12 @@ pub struct Daemon<B: Backend, C: Painter> {
     /// App display names showing a notification badge; drives the red dot on their tabs.
     badges: HashSet<String>,
     badge_tick: u32,
+    /// Running apps that own no window, trailing the tabs as bare icons.
+    windowless: Vec<String>,
+    /// Which of them the bar shows.
+    windowless_policy: Windowless,
+    /// Apps that have owned a window this session, so a closed-window app can be told from one that never had one.
+    seen_apps: HashSet<String>,
     /// Whether a window is fullscreen, so the chrome hides instead of sitting over it.
     fullscreen: bool,
     /// Edge of the main display the tab bar sits on, and so which edge the layout gives up.
@@ -110,6 +116,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         crate::chrome::theme::set_mark(config.mark);
         let bar_position = config.bar_position.unwrap_or(backend.default_bar_position());
         let apps = backend.launchable_apps();
+        let seen_apps: HashSet<String> = windows.iter().map(|(_, w)| w.app.clone()).collect();
         Daemon {
             model: Some(model),
             backend,
@@ -119,6 +126,9 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             quit: false,
             badges: HashSet::new(),
             badge_tick: 0,
+            windowless: Vec::new(),
+            windowless_policy: config.windowless,
+            seen_apps,
             restored: false,
             last_shown: HashSet::new(),
             pending_reframe: Vec::new(),
@@ -189,6 +199,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             badges: &self.badges,
             off_workspace: &self.off_workspace,
             hotkeys: &self.app_hotkeys,
+            windowless: &self.windowless,
             main_screen: self.main_screen,
             bar_position: self.bar_position,
             focus_border: self.focus_border,

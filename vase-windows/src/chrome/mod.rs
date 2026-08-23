@@ -14,6 +14,7 @@ use windows_numerics::Vector2;
 use vase_core::chrome::bar::{self, Bar, Hits, Run};
 use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
 use vase_core::chrome::theme::{mark, style, Role, Style, PANE_PAD, PANE_RADIUS};
+use vase_core::chrome::BarHits;
 use vase_core::chrome::{bar_height, ListAt, Painter, SwitchRow, FONT_SIZE};
 use vase_core::geometry::{bbox, Rect};
 
@@ -44,10 +45,11 @@ enum Laid {
 }
 
 impl Laid {
-    fn hits(&self) -> Hits {
+    fn hits(&self) -> BarHits {
         match self {
-            Laid::Fluent(strip) => strip.hits(),
-            Laid::Powerline(layout) => layout.hits(),
+            // The Fluent strip trails no icons: Windows reports no windowless apps to draw.
+            Laid::Fluent(strip) => BarHits { tabs: strip.hits(), apps: Vec::new() },
+            Laid::Powerline(layout) => BarHits { tabs: layout.hits(), apps: layout.app_hits() },
         }
     }
 
@@ -77,15 +79,15 @@ impl D2DPainter {
 
     /// Paint one laid-out bar into `surface`, in the style it was laid out in. `prompt` is the command
     /// line's text, which goes in the same pass: a second pass over the surface would clear the strip.
-    fn paint_bar(gpu: &Gpu, icons: &Icons, surface: &mut Surface, laid: &Laid, prompt: Option<&str>) {
+    fn paint_bar(gpu: &Gpu, icons: &Icons, surface: &mut Surface, laid: &Laid, prompt: Option<&str>, apps: &[String]) {
         match laid {
             Laid::Fluent(strip) => fluent::paint(gpu, icons, surface, strip, prompt),
-            Laid::Powerline(layout) => Self::paint_powerline(gpu, icons, surface, layout, prompt),
+            Laid::Powerline(layout) => Self::paint_powerline(gpu, icons, surface, layout, prompt, apps),
         }
     }
 
     /// Paint one laid-out powerline bar into `surface`.
-    fn paint_powerline(gpu: &Gpu, icons: &Icons, surface: &mut Surface, layout: &BarLayout, prompt: Option<&str>) {
+    fn paint_powerline(gpu: &Gpu, icons: &Icons, surface: &mut Surface, layout: &BarLayout, prompt: Option<&str>, apps: &[String]) {
         let (h, r) = (bar_height(), layout.radius);
         let _ = surface.draw(gpu, layout.rect, |dc| unsafe {
             let factory = &gpu.factory;
@@ -156,6 +158,13 @@ impl D2DPainter {
                     }
                 }
             }
+            // The trailing windowless-app icons, between the last tab and the dot.
+            for (x, app) in layout.apps.iter().zip(apps) {
+                if let Some(bitmap) = icons.get(app) {
+                    let y = (h - TAB_ICON) / 2.0;
+                    dc.DrawBitmap(bitmap, Some(&rect_f(*x, y, TAB_ICON, TAB_ICON)), 1.0, D2D1_INTERPOLATION_MODE_LINEAR, None, None);
+                }
+            }
             if let Some((dot_x, armed)) = layout.dot {
                 let role = if armed { Role::Accent } else { Role::Dim };
                 if let Ok(brush) = dc.CreateSolidColorBrush(&color(role), None) {
@@ -176,18 +185,18 @@ impl Painter for D2DPainter {
         self.gpu.measure(text, size)
     }
 
-    fn bar(&mut self, bar: &Bar) -> Hits {
+    fn bar(&mut self, bar: &Bar) -> BarHits {
         self.icons.collect(&self.gpu);
         let laid = self.lay_out(bar);
-        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &laid, None);
+        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &laid, None, bar.apps);
         self.gpu.commit();
         laid.hits()
     }
 
     fn prompt(&mut self, rect: Rect, text: &str) {
         // The command line owns the bar: the mark stays, the tabs do not.
-        let bare = self.lay_out(&Bar { rect, tabs: &[], selected: 0, main: true, armed: false }).bare();
-        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &bare, Some(text));
+        let bare = self.lay_out(&Bar { rect, tabs: &[], apps: &[], selected: 0, main: true, armed: false }).bare();
+        Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &bare, Some(text), &[]);
         self.gpu.commit();
     }
 
@@ -196,6 +205,7 @@ impl Painter for D2DPainter {
     }
 
     fn stack_bars(&mut self, bars: &[Bar]) -> Vec<Hits> {
+        // A stack bar carries no trailing icons, so only its tab spans can be clicked.
         self.icons.collect(&self.gpu);
         while self.stack_bars.len() < bars.len() {
             let Ok(surface) = Surface::new(&self.gpu) else { break };
@@ -203,13 +213,13 @@ impl Painter for D2DPainter {
         }
         let laid: Vec<Laid> = bars.iter().map(|bar| self.lay_out(bar)).collect();
         for (surface, bar) in self.stack_bars.iter_mut().zip(&laid) {
-            Self::paint_bar(&self.gpu, &self.icons, surface, bar, None);
+            Self::paint_bar(&self.gpu, &self.icons, surface, bar, None, &[]);
         }
         for surface in &mut self.stack_bars[bars.len()..] {
             surface.hide();
         }
         self.gpu.commit();
-        laid.iter().map(Laid::hits).collect()
+        laid.iter().map(|bar| bar.hits().tabs).collect()
     }
 
     fn panes(&mut self, panes: &[(Rect, bool)]) {

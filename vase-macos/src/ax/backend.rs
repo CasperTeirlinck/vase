@@ -174,15 +174,14 @@ impl Backend for MacBackend {
     fn launch(&self, app: &str) {
         // `-n` opens a fresh instance so an already-running app still yields a new window for the pane. Singletons
         // refuse `-n`, so fall back to plain activation. Finder won't open a window on activation, so point it at $HOME.
-        let cmd = if app == "Finder" {
-            "open ~".to_string()
-        } else {
-            let q = app.replace('\'', r"'\''");
-            format!("open -na '{q}' || open -a '{q}'")
-        };
-        if let Err(e) = std::process::Command::new("sh").arg("-c").arg(&cmd).spawn() {
-            eprintln!("failed to launch {app}: {e}");
-        }
+        let q = quote(app);
+        open(app, if app == "Finder" { "open ~".to_string() } else { format!("open -na '{q}' || open -a '{q}'") });
+    }
+
+    fn activate(&self, app: &str) {
+        // No `-n`: the app is already running, and fronting it is what makes a windowless one open a
+        // window of its own, the way its Dock icon does.
+        open(app, if app == "Finder" { "open ~".to_string() } else { format!("open -a '{}'", quote(app)) });
     }
 
     fn warp_cursor(&self, x: f64, y: f64) {
@@ -191,5 +190,20 @@ impl Backend for MacBackend {
 
     fn badged_apps(&self) -> HashSet<String> {
         crate::dock::badged_apps()
+    }
+
+    fn running_apps(&self) -> Vec<String> {
+        crate::dock::running_apps()
+    }
+}
+
+/// An app name as a single-quoted shell word.
+fn quote(app: &str) -> String {
+    app.replace('\'', r"'\''")
+}
+
+fn open(app: &str, cmd: String) {
+    if let Err(e) = std::process::Command::new("sh").arg("-c").arg(&cmd).spawn() {
+        eprintln!("failed to launch {app}: {e}");
     }
 }
