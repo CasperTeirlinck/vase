@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
-use crate::tree::{Dir, Node, Pane, PaneId};
+use crate::tree::{Dir, Node, Pane, PaneId, WindowId};
 
 /// An axis-aligned rectangle in screen points.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -15,6 +17,25 @@ impl Rect {
     pub fn new(x: f64, y: f64, w: f64, h: f64) -> Self {
         Rect { x, y, w, h }
     }
+}
+
+/// Whether two rects share any area.
+pub fn overlaps(a: Rect, b: Rect) -> bool {
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+}
+
+/// Whether anything outside `panes` covers one of them. `stack` lists the windows on screen front to
+/// back, so everything walked past sits above what comes next.
+pub fn any_covered(stack: &[(WindowId, Rect)], panes: &HashSet<WindowId>) -> bool {
+    let mut over: Vec<Rect> = Vec::new();
+    for (id, rect) in stack {
+        if !panes.contains(id) {
+            over.push(*rect);
+        } else if over.iter().any(|r| overlaps(*r, *rect)) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Index of the display whose bounds contain `frame`'s center (else 0).

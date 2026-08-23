@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::geometry::*;
 use crate::tree::{Dir, Node, Pane, PaneId, WindowId};
 
@@ -38,4 +40,27 @@ fn screen_of_places_a_frame_by_its_center() {
     assert_eq!(screen_of(Rect::new(900.0, 10.0, 400.0, 100.0), &screens), 1);
     // Off every display falls back to the first.
     assert_eq!(screen_of(Rect::new(-9000.0, 0.0, 10.0, 10.0), &screens), 0);
+}
+
+/// Two panes side by side, and a foreign window over the right one.
+fn stack(order: &[(u64, Rect)]) -> Vec<(WindowId, Rect)> {
+    order.iter().map(|(id, r)| (WindowId(*id), *r)).collect()
+}
+
+#[test]
+fn a_pane_counts_as_covered_only_by_a_window_above_it_that_overlaps() {
+    let left = Rect::new(0.0, 0.0, 100.0, 100.0);
+    let right = Rect::new(100.0, 0.0, 100.0, 100.0);
+    let panes = HashSet::from([WindowId(1), WindowId(2)]);
+
+    // Nothing else on screen: both panes are clear whatever their own order.
+    assert!(!any_covered(&stack(&[(1, left), (2, right)]), &panes));
+    // A foreign window in front, over the right pane.
+    assert!(any_covered(&stack(&[(9, right), (1, left), (2, right)]), &panes));
+    // In front but elsewhere on screen, so nothing is buried.
+    assert!(!any_covered(&stack(&[(9, Rect::new(300.0, 0.0, 50.0, 50.0)), (1, left), (2, right)]), &panes));
+    // Overlapping but behind both panes.
+    assert!(!any_covered(&stack(&[(1, left), (2, right), (9, right)]), &panes));
+    // A pane over its own sibling is the tab covering itself, not a hole in it.
+    assert!(!any_covered(&stack(&[(1, right), (2, right)]), &panes));
 }

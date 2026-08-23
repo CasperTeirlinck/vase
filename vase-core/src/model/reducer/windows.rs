@@ -91,12 +91,15 @@ pub(super) fn move_window(mut model: Model, dir: Direction) -> (Model, Vec<Effec
 }
 
 pub(super) fn sync_focus(mut model: Model, id: WindowId) -> (Model, Vec<Effect>) {
-    if let Some((si, ti, pid)) = locate_window(&model, id) {
-        model.focused_screen = si;
-        model.screens[si].current = ti;
-        model.screens[si].tabs[ti].focused = pid;
-    }
-    (model, vec![])
+    let Some((si, ti, pid)) = locate_window(&model, id) else {
+        return (model, vec![]);
+    };
+    model.focused_screen = si;
+    model.screens[si].current = ti;
+    model.screens[si].tabs[ti].focused = pid;
+    // The OS already fronted `id`; the effect is what brings the rest of its tab up with it, so a click
+    // on one pane of a split never leaves the others buried.
+    (model, vec![Effect::FocusWindow(id)])
 }
 
 pub(super) fn raise(mut model: Model, id: WindowId) -> (Model, Vec<Effect>) {

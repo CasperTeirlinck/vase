@@ -48,7 +48,10 @@ fn sync_focus_locates_the_tab_and_pane_across_tabs() {
     let (m, effects) = apply(three(), Command::SyncFocus(win(3)));
     assert_eq!(m.screens[0].current, 2);
     assert_eq!(m.focused_window(), Some(win(3)));
-    assert_eq!(effects, vec![]);
+    // No Render: the OS placed nothing. The focus effect is what surfaces the rest of the tab.
+    assert_eq!(effects, vec![Effect::FocusWindow(win(3))]);
+    // A window vase doesn't hold is nobody's focus to sync.
+    assert_eq!(apply(three(), Command::SyncFocus(win(99))).1, vec![]);
 }
 
 #[test]

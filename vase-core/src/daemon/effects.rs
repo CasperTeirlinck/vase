@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use crate::backend::Backend;
-use crate::geometry::{screen_of, Rect};
+use crate::geometry::{any_covered, screen_of, Rect};
 use crate::model::Effect;
 use crate::tree::WindowId;
 
@@ -12,7 +12,8 @@ use crate::chrome::Painter;
 
 impl<B: Backend, C: Painter> Daemon<B, C> {
     pub fn execute(&mut self, effects: Vec<Effect>) {
-        // A batch with a Render is a bring-forward (tab switch, Raise); a bare FocusWindow is a within-tab move. Only the former co-surfaces the tab's other panes.
+        // A batch with a Render has just moved windows, so it re-fronts the focused tab whatever the
+        // z-order says; a bare FocusWindow checks first, since re-fronting a clear tab costs a flick.
         let bringing_forward = effects.iter().any(|e| matches!(e, Effect::Render(_)));
         // Selecting a minimized window's tab restores it: un-minimize before the Render places it.
         if let Some(w) = effects.iter().find_map(|e| match e {
@@ -60,10 +61,9 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
                     }
                 }
                 // Bring every visible pane of the focused tab to the front, then focus the target last: a tab's layout is all-or-nothing, no holes. `focus` (SkyLight) raises each specific window;
-                // `raise` fronts a whole app and can lift its off-tab windows over a sibling pane. Only VISIBLE panes (in `last_shown`) are surfaced. Gated to bring-forward batches
-                // so within-tab focus moves don't flick.
+                // `raise` fronts a whole app and can lift its off-tab windows over a sibling pane. Only VISIBLE panes (in `last_shown`) are surfaced.
                 Effect::FocusWindow(id) => {
-                    if bringing_forward {
+                    if bringing_forward || self.tab_partly_covered() {
                         if let Some(tab) = self.model.as_ref().and_then(|m| m.focused_tab()) {
                             for sib in crate::tree::windows(&tab.root) {
                                 if sib != id && self.last_shown.contains(&sib) {
@@ -76,6 +76,20 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
                 }
             }
         }
+    }
+
+    /// Whether another window covers one of the focused tab's visible panes, which a focus move has to
+    /// clear so the tab is never left showing in part.
+    fn tab_partly_covered(&mut self) -> bool {
+        let Some(tab) = self.model.as_ref().and_then(|m| m.focused_tab()) else { return false };
+        let panes: HashSet<WindowId> = crate::tree::windows(&tab.root).into_iter().filter(|w| self.last_shown.contains(w)).collect();
+        // A single pane is fronted by the focus itself; only siblings can be left behind.
+        if panes.len() < 2 {
+            return false;
+        }
+        // Panels, menus and vase's own chrome sit above by design, so only normal windows can cover a pane.
+        let stack: Vec<(WindowId, Rect)> = self.backend.list_windows().into_iter().filter(|w| w.layer == 0).map(|w| (w.id, w.frame)).collect();
+        any_covered(&stack, &panes)
     }
 
     /// Re-assert the frames of windows that moved to another monitor, once they've settled (after `REFRAME_SETTLE`).
