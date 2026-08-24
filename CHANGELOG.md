@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (2026-08-24)
+
+### 🚀 Features
+
+- Trail the tabs with running apps that have no window
+- A shortcut sheet on prefix-? and in the menu
+
+### 🐛 Bug Fixes
+
+- Front a whole tab when focus moves into one of its panes
 ## 0.3.0 (2026-08-23)
 
 ### 🚀 Features
