@@ -12,6 +12,7 @@ use windows::Win32::Graphics::DirectWrite::DWRITE_TEXT_METRICS;
 use windows_numerics::Vector2;
 
 use vase_core::chrome::bar::{self, Bar, Hits, Run};
+use vase_core::chrome::help::{CellKind, HelpLayout, TextStyle};
 use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
 use vase_core::chrome::theme::{mark, style, Role, Style, PANE_PAD, PANE_RADIUS};
 use vase_core::chrome::BarHits;
@@ -35,6 +36,7 @@ pub struct D2DPainter {
     panes: Surface,
     focus: Surface,
     list: Surface,
+    help: Surface,
     icons: Icons,
 }
 
@@ -65,7 +67,16 @@ impl Laid {
 impl D2DPainter {
     pub fn new() -> windows::core::Result<D2DPainter> {
         let gpu = Gpu::new()?;
-        Ok(D2DPainter { bar: Surface::new(&gpu)?, stack_bars: Vec::new(), panes: Surface::new(&gpu)?, focus: Surface::new(&gpu)?, list: Surface::new(&gpu)?, icons: Icons::default(), gpu })
+        Ok(D2DPainter {
+            bar: Surface::new(&gpu)?,
+            stack_bars: Vec::new(),
+            panes: Surface::new(&gpu)?,
+            focus: Surface::new(&gpu)?,
+            list: Surface::new(&gpu)?,
+            help: Surface::new(&gpu)?,
+            icons: Icons::default(),
+            gpu,
+        })
     }
 
     /// Lay a bar out in the theme's style, against DirectWrite's own text metrics.
@@ -353,6 +364,57 @@ impl Painter for D2DPainter {
         self.list.hide();
     }
 
+    fn help(&mut self, layout: &HelpLayout) {
+        let gpu = &self.gpu;
+        let _ = self.help.draw(gpu, layout.rect, |dc| unsafe {
+            let card = D2D1_ROUNDED_RECT { rect: rect_f(0.0, 0.0, layout.rect.w, layout.rect.h), radiusX: PANE_RADIUS as f32, radiusY: PANE_RADIUS as f32 };
+            if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Bg), None) {
+                dc.FillRoundedRectangle(&card, &brush);
+            }
+            if let Ok(brush) = dc.CreateSolidColorBrush(&color(Role::Border), None) {
+                dc.DrawRoundedRectangle(&card, &brush, 1.0, None);
+            }
+            // The miniatures: a filled pane for what the command acts on, an outline for an empty one.
+            for cell in &layout.cells {
+                let mini = D2D1_ROUNDED_RECT { rect: rect_f(cell.rect.x, cell.rect.y, cell.rect.w, cell.rect.h), radiusX: 2.0, radiusY: 2.0 };
+                let (role, fill) = match cell.kind {
+                    CellKind::Active => (Role::Accent, true),
+                    CellKind::Plain => (Role::Active, true),
+                    CellKind::Ghost => (Role::Dim, false),
+                };
+                if let Ok(brush) = dc.CreateSolidColorBrush(&color(role), None) {
+                    if fill {
+                        dc.FillRoundedRectangle(&mini, &brush);
+                    } else {
+                        dc.DrawRoundedRectangle(&mini, &brush, 1.0, None);
+                    }
+                }
+            }
+            for text in &layout.texts {
+                // Segoe UI for the prose, monospaced chords so they align down their column.
+                let (size, role) = match text.style {
+                    TextStyle::Title => (12.0, Role::Dim),
+                    TextStyle::Section => (11.5, Role::Accent),
+                    // The action reads first and the chord second, as a native shortcut list has it.
+                    TextStyle::Keys => (11.0, Role::Dim),
+                    TextStyle::Label => (11.5, Role::Text),
+                };
+                let Ok(layout_text) = gpu.trimmed(&text.text, size, text.rect.w) else { continue };
+                let mut m = DWRITE_TEXT_METRICS::default();
+                let _ = layout_text.GetMetrics(&mut m);
+                let y = text.rect.y + (text.rect.h - m.height as f64) / 2.0;
+                if let Ok(brush) = dc.CreateSolidColorBrush(&color(role), None) {
+                    dc.DrawTextLayout(Vector2 { X: text.rect.x as f32, Y: y as f32 }, &layout_text, &brush, D2D1_DRAW_TEXT_OPTIONS_NONE);
+                }
+            }
+        });
+        self.gpu.commit();
+    }
+
+    fn hide_help(&mut self) {
+        self.help.hide();
+    }
+
     fn hide_bars(&mut self) {
         self.bar.hide();
         for surface in &mut self.stack_bars {
@@ -365,6 +427,7 @@ impl Painter for D2DPainter {
         self.panes.hide();
         self.focus.hide();
         self.list.hide();
+        self.help.hide();
     }
 
     fn prewarm_icon(&mut self, app: &str) {

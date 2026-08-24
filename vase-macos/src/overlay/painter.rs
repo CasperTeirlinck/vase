@@ -2,10 +2,12 @@
 
 use objc2::MainThreadMarker;
 use vase_core::chrome::bar::{Bar, Hits};
+use vase_core::chrome::help::HelpLayout;
 use vase_core::chrome::BarHits;
 use vase_core::chrome::{ListAt, Painter, SwitchRow};
 use vase_core::geometry::Rect;
 
+use super::help::HelpView;
 use super::panes::{FocusBorder, PaneOverlay};
 use super::switcher::SwitcherView;
 use super::tab_bar::TabBar;
@@ -18,12 +20,13 @@ pub struct AppKitPainter {
     focus_border: FocusBorder,
     /// Shared panel behind the window switcher, the pane picker, and the launching placeholder.
     list: SwitcherView,
+    help: HelpView,
     mtm: MainThreadMarker,
 }
 
 impl AppKitPainter {
     pub fn new(mtm: MainThreadMarker) -> AppKitPainter {
-        AppKitPainter { bar: TabBar::new(mtm), stack_bars: Vec::new(), panes: PaneOverlay::new(mtm), focus_border: FocusBorder::new(mtm), list: SwitcherView::new(mtm), mtm }
+        AppKitPainter { bar: TabBar::new(mtm), stack_bars: Vec::new(), panes: PaneOverlay::new(mtm), focus_border: FocusBorder::new(mtm), list: SwitcherView::new(mtm), help: HelpView::new(mtm), mtm }
     }
 }
 
@@ -78,6 +81,14 @@ impl Painter for AppKitPainter {
         self.list.hide();
     }
 
+    fn help(&mut self, layout: &HelpLayout) {
+        self.help.show(layout);
+    }
+
+    fn hide_help(&mut self) {
+        self.help.hide();
+    }
+
     fn hide_bars(&mut self) {
         self.bar.hide();
         for bar in &self.stack_bars {
@@ -90,6 +101,7 @@ impl Painter for AppKitPainter {
         self.panes.hide();
         self.focus_border.hide();
         self.list.hide();
+        self.help.hide();
     }
 
     fn prewarm_icon(&mut self, app: &str) {

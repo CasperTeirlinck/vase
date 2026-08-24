@@ -100,6 +100,8 @@ release, then a command key. A dot at the right of the tab bar lights up in the 
 color while the prefix is armed. In the tables below `⌥`/`⌘`/`⌃`/`⇧` are
 Option/Command/Control/Shift on macOS and Alt/Win/Ctrl/Shift on Windows.
 
+`⌥a ?` shows an overview of all the keyboard shortcuts as shown below:
+
 ### Tabs
 
 | Key               | Action                                      |
@@ -115,15 +117,15 @@ Option/Command/Control/Shift on macOS and Alt/Win/Ctrl/Shift on Windows.
 
 ### Panes
 
-| Key                           | Action                                     |
-| ----------------------------- | ------------------------------------------ |
-| `⌥a \` / `⌥a -`               | split right / down (opens the pane picker) |
-| `⌥a ← ↑ → ↓`                  | move focus                                 |
-| `⌥a ⇧`+arrows / `⌥a ⇧HJKL`    | resize                                     |
-| `⌥a ⌘/⌃/⌥`+`HJKL` (or arrows) | move the pane                              |
-| `⌥a z`                        | zoom the focused pane                      |
-| `⌥a x`                        | break the pane out into its own tab        |
-| `⌥a m`                        | move the cursor to the focused pane        |
+| Key                           | Action                                          |
+| ----------------------------- | ----------------------------------------------- |
+| `⌥a \` / `⌥a -`               | split right / down (opens the pane picker)      |
+| `⌥a ← ↑ → ↓`                  | move focus                                      |
+| `⌥a ⇧`+arrows / `⌥a ⇧HJKL`    | resize                                          |
+| `⌥a ⌘/⌃/⌥`+`HJKL` (or arrows) | move the pane                                   |
+| `⌥a z`                        | zoom the focused pane                           |
+| `⌥a x`                        | break the pane out into its own tab             |
+| `⌥a m`                        | move the cursor to the focused pane             |
 | `⌥a ⌃r`                       | resync: force every window back onto the layout |
 
 ### Stacks

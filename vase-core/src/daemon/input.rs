@@ -13,11 +13,16 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     /// for a platform that has to answer "is this key the overlay's?" at a moment when it cannot ask
     /// the daemon itself.
     pub fn modal(&self) -> bool {
-        self.pending_launch.is_some() || self.prompt.is_some() || self.switcher.is_some() || self.pane_picker.is_some() || self.tab_entry.is_pending()
+        self.pending_launch.is_some() || self.prompt.is_some() || self.switcher.is_some() || self.pane_picker.is_some() || self.tab_entry.is_pending() || self.help_open
     }
 
     /// Offer a key to whatever is modal, before the prefix router sees it. Returns whether the key was swallowed. The order here *is* the modal precedence.
     pub fn intercept_key(&mut self, key: Key) -> bool {
+        // The sheet is a read-only overlay, so the next key of any kind dismisses it and is spent doing so.
+        if self.help_open {
+            self.close_help();
+            return true;
+        }
         // A launch in flight makes its pane modal: only Esc, which cancels and collapses the pane.
         if self.pending_launch.is_some() {
             if key.code == KeyCode::Escape {
@@ -75,6 +80,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             I::CommandLine => self.start_command(),
             I::WarpCursor => self.warp_cursor_to_focus(),
             I::Resync => self.resync(),
+            I::Help => self.toggle_help(),
             I::SelectBarTab(n) => self.begin_tab_entry(n),
             I::SendPrefix => {}
             // Everything else is a model edit `from_input` already returned.

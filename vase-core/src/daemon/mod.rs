@@ -3,6 +3,7 @@
 mod app_focus;
 mod bar;
 mod effects;
+mod help;
 mod input;
 mod pane_picker;
 mod prompt;
@@ -63,6 +64,8 @@ pub struct Daemon<B: Backend, C: Painter> {
     seen_apps: HashSet<String>,
     /// Whether a window is fullscreen, so the chrome hides instead of sitting over it.
     fullscreen: bool,
+    /// Whether the shortcut sheet is up.
+    help_open: bool,
     /// Edge of the main display the tab bar sits on, and so which edge the layout gives up.
     bar_position: Position,
     /// Whether to outline the focused pane of a split tab.
@@ -134,6 +137,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             pending_reframe: Vec::new(),
             reframe_deadline: None,
             fullscreen: false,
+            help_open: false,
             bar_position,
             focus_border: config.focus_border,
             off_workspace: HashSet::new(),
@@ -188,6 +192,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     pub fn refresh(&mut self) {
         // A fullscreen window owns the whole display; hide everything so nothing sits over it.
         if self.fullscreen {
+            self.help_open = false;
             self.chrome.hide_all();
             return;
         }

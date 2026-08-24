@@ -4,8 +4,18 @@ use std::collections::HashMap;
 
 use super::{InputCommand, Key, KeyCode, KeyRouter, Mods};
 
+/// The chord that arms the tab and pane bindings.
+pub fn prefix() -> Key {
+    Key::alt(KeyCode::Char('a'))
+}
+
+/// The chord that arms the same keys against the focused stack.
+pub fn stack_prefix() -> Key {
+    Key::alt(KeyCode::Char('e'))
+}
+
 pub fn router() -> KeyRouter {
-    KeyRouter::new(Key::alt(KeyCode::Char('a')), bindings()).with_prefix(Key::alt(KeyCode::Char('e')), bindings_nested())
+    KeyRouter::new(prefix(), bindings()).with_prefix(stack_prefix(), bindings_nested())
 }
 
 pub(crate) fn bindings() -> HashMap<Key, InputCommand> {
@@ -34,8 +44,9 @@ pub(crate) fn bindings() -> HashMap<Key, InputCommand> {
     for (code, cmd) in [(KeyCode::Left, I::FocusLeft), (KeyCode::Right, I::FocusRight), (KeyCode::Up, I::FocusUp), (KeyCode::Down, I::FocusDown)] {
         b.insert(Key::plain(code), cmd);
     }
-    // prefix-: (":" is Shift-semicolon on a US layout).
+    // prefix-: (":" is Shift-semicolon on a US layout), prefix-? ("?" is Shift-slash).
     b.insert(Key { code: KeyCode::Char(';'), mods: shift }, I::CommandLine);
+    b.insert(Key { code: KeyCode::Char('/'), mods: shift }, I::Help);
     // prefix-Ctrl-r re-places every window onto its layout (recover from a manual move or a monitor hotplug).
     // Bind meta/ctrl/alt, like the move-pane keys, since per-device modifier swaps land Ctrl differently per keyboard.
     for mods in [Mods { meta: true, ..Mods::default() }, Mods { ctrl: true, ..Mods::default() }, Mods { alt: true, ..Mods::default() }] {

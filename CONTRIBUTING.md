@@ -33,7 +33,8 @@ re-approved in System Settings → Privacy & Security.
 
 To look at a chrome style without running the daemon
 `cargo run -p vase-macos --example bar_preview native` (`-p vase-windows` on Windows) draws a bar of stand-in tabs
-and the switcher card on screen for a few seconds; pass `powerline` for the other style.
+and the switcher card on screen for a few seconds; pass `powerline` for the other style, and, on macOS, `help` to
+draw the shortcut sheet as well.
 
 [CONTEXT.md](CONTEXT.md) defines the vocabulary the code is named after (tab, pane, stack, chrome, prefix). Read it
 before naming anything new.

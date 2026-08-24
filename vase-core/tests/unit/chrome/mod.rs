@@ -1,6 +1,7 @@
 use crate::chrome::*;
 
 mod deck;
+mod help;
 mod powerline;
 mod theme;
 

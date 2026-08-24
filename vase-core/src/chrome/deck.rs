@@ -93,6 +93,15 @@ impl<C: Painter> Deck<C> {
         self.painter.hide_list();
     }
 
+    /// Draw the shortcut sheet, centered on `screen`.
+    pub fn help(&mut self, screen: Rect) {
+        self.painter.help(&super::help::layout(screen));
+    }
+
+    pub fn hide_help(&mut self) {
+        self.painter.hide_help();
+    }
+
     pub fn hide_bars(&mut self) {
         self.painter.hide_bars();
     }

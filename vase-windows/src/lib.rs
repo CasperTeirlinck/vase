@@ -22,6 +22,7 @@ static SHOULD_QUIT: AtomicBool = AtomicBool::new(false);
 static NEW_TAB: AtomicBool = AtomicBool::new(false);
 static RELOAD_CONFIG: AtomicBool = AtomicBool::new(false);
 static RESYNC: AtomicBool = AtomicBool::new(false);
+static HELP: AtomicBool = AtomicBool::new(false);
 static MODAL: AtomicBool = AtomicBool::new(false);
 
 // Whether an overlay is taking keys, mirrored out of the daemon. The keyboard hook can be re-entered
@@ -77,6 +78,12 @@ pub fn request_resync() {
 }
 pub fn take_resync() -> bool {
     RESYNC.swap(false, Ordering::SeqCst)
+}
+pub fn request_help() {
+    HELP.store(true, Ordering::SeqCst);
+}
+pub fn take_help() -> bool {
+    HELP.swap(false, Ordering::SeqCst)
 }
 
 pub use backend::WindowsBackend;

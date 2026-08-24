@@ -19,6 +19,7 @@ const CLASS: PCWSTR = w!("vase_tray");
 const ABOUT: usize = 1;
 const NEW_TAB: usize = 2;
 const RESYNC: usize = 6;
+const HELP: usize = 7;
 const RELOAD_CONFIG: usize = 3;
 const SETTINGS: usize = 4;
 const QUIT: usize = 5;
@@ -71,6 +72,7 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         WM_COMMAND => {
             match wparam.0 & 0xffff {
                 ABOUT => about(),
+                HELP => crate::request_help(),
                 NEW_TAB => crate::request_new_tab(),
                 RESYNC => crate::request_resync(),
                 RELOAD_CONFIG => crate::request_reload_config(),
@@ -95,6 +97,7 @@ fn show_menu(hwnd: HWND) {
         };
         item(ABOUT, w!("About vase"));
         separator();
+        item(HELP, w!("Keyboard shortcuts"));
         item(NEW_TAB, w!("New tab"));
         item(RESYNC, w!("Resync windows"));
         item(RELOAD_CONFIG, w!("Reload config"));

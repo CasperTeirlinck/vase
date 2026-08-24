@@ -22,6 +22,22 @@ impl KeyCode {
         }
     }
 
+    /// The key as a user reads it: the character it types, or a glyph for the named keys.
+    pub fn label(self) -> String {
+        match self {
+            KeyCode::Char(' ') => "space".to_string(),
+            KeyCode::Char(c) => c.to_string(),
+            KeyCode::Escape => "esc".to_string(),
+            KeyCode::Return => "⏎".to_string(),
+            KeyCode::Backspace => "⌫".to_string(),
+            KeyCode::Tab => "⇥".to_string(),
+            KeyCode::Left => "←".to_string(),
+            KeyCode::Right => "→".to_string(),
+            KeyCode::Up => "↑".to_string(),
+            KeyCode::Down => "↓".to_string(),
+        }
+    }
+
     /// The key a config chord names (`a`, `7`, `grave`, `escape`, ...).
     pub fn from_name(name: &str) -> Option<KeyCode> {
         Some(match name {

@@ -29,6 +29,11 @@ define_class!(
             crate::request_reload_config();
         }
 
+        #[unsafe(method(help:))]
+        fn help(&self, _sender: Option<&AnyObject>) {
+            crate::request_help();
+        }
+
         // Re-place every window onto its layout, recovering from a manual move or a monitor hotplug.
         #[unsafe(method(resync:))]
         fn resync(&self, _sender: Option<&AnyObject>) {
@@ -114,6 +119,7 @@ pub fn install(mtm: MainThreadMarker) -> Retained<NSStatusItem> {
     };
     add("About vase", sel!(about:), "");
     menu.addItem(&NSMenuItem::separatorItem(mtm));
+    add("Keyboard shortcuts", sel!(help:), "");
     add("New tab", sel!(newTab:), "");
     add("Resync windows", sel!(resync:), "");
     add("Reload config", sel!(reloadConfig:), "");

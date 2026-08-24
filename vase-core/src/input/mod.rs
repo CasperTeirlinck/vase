@@ -7,7 +7,7 @@ mod switcher;
 
 pub use entry::*;
 pub use keycode::KeyCode;
-pub use keymap::router;
+pub use keymap::{prefix, router, stack_prefix};
 pub use switcher::*;
 
 /// Active modifier set on a key event.
@@ -58,6 +58,19 @@ impl Key {
     /// A plain letter/digit/punctuation key.
     pub fn ch(c: char) -> Self {
         Key::plain(KeyCode::Char(c))
+    }
+
+    /// The chord as a user reads it: modifier glyphs, then the key. The glyphs are the Mac ones,
+    /// which the docs read as Alt/Win/Ctrl/Shift on Windows.
+    pub fn chord(self) -> String {
+        let mut out = String::new();
+        for (held, glyph) in [(self.mods.ctrl, '⌃'), (self.mods.alt, '⌥'), (self.mods.shift, '⇧'), (self.mods.meta, '⌘')] {
+            if held {
+                out.push(glyph);
+            }
+        }
+        out.push_str(&self.code.label());
+        out
     }
 }
 
@@ -115,6 +128,8 @@ pub enum InputCommand {
     WarpCursor,
     /// Re-adopt windows and force every managed window back onto its layout rect (prefix Ctrl-R).
     Resync,
+    /// Show the shortcut sheet (prefix-?).
+    Help,
     Quit,
 }
 

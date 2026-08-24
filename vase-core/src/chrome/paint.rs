@@ -3,6 +3,7 @@
 use crate::geometry::Rect;
 
 use super::bar::{Bar, Hits};
+use super::help::HelpLayout;
 
 /// Where a drawn tab bar's clickable pieces landed.
 #[derive(Default)]
@@ -66,6 +67,11 @@ pub trait Painter {
     fn list(&mut self, at: ListAt, header: &str, rows: &[SwitchRow], selected: usize);
 
     fn hide_list(&mut self);
+
+    /// Draw the shortcut sheet as a card, centered where the layout puts it.
+    fn help(&mut self, layout: &HelpLayout);
+
+    fn hide_help(&mut self);
 
     fn hide_bars(&mut self);
 

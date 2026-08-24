@@ -2,6 +2,7 @@
 
 pub mod bar;
 pub(crate) mod deck;
+pub mod help;
 mod paint;
 pub mod powerline;
 pub mod theme;

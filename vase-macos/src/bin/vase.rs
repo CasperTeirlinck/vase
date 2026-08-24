@@ -153,6 +153,9 @@ fn run_event_loop(mtm: objc2::MainThreadMarker, daemon: &Rc<RefCell<Vase>>, tap:
         if vase_macos::take_resync() {
             daemon.borrow_mut().resync();
         }
+        if vase_macos::take_help() {
+            daemon.borrow_mut().toggle_help();
+        }
         daemon.borrow_mut().tick_tab_entry();
         daemon.borrow_mut().tick_switcher();
         daemon.borrow_mut().tick_pane_picker();

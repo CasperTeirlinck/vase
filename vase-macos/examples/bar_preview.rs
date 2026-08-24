@@ -39,6 +39,9 @@ fn main() {
     let rows: Vec<SwitchRow> = tabs.iter().map(row).collect();
     // Centered below the bar, so the two surfaces can be looked at (or screenshot) together.
     painter.list(ListAt::Centered(Rect::new(0.0, 360.0, 1200.0, 600.0)), "switch to: liq", &rows, 1);
+    if std::env::args().any(|a| a == "help") {
+        painter.help(&vase_core::chrome::help::layout(Rect::new(0.0, 0.0, 1600.0, 1000.0)));
+    }
 
     // Hold the panel on screen long enough to look at (or screenshot), servicing AppKit so it draws.
     let app = NSApplication::sharedApplication(mtm);

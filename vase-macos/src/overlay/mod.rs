@@ -1,6 +1,7 @@
 //! Non-activating, always-on-top overlay windows (AppKit). Main-thread only.
 
 mod glass;
+mod help;
 mod painter;
 mod panel;
 mod panes;
