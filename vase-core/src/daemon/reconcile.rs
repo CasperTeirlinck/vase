@@ -105,9 +105,18 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         self.reconcile();
         // The quiet poll leaves an already-placed window where it is; force a full re-place and raise instead.
         self.last_shown.clear();
-        let placements = self.model.as_ref().unwrap().placements();
+        let model = self.model.as_ref().unwrap();
+        let placements = model.placements();
+        let shown: HashSet<WindowId> = placements.iter().map(|(id, _)| *id).collect();
+        let hidden: Vec<(WindowId, Rect)> = model.all_placements().into_iter().filter(|(id, _)| !shown.contains(id)).collect();
+        let focused = model.focused_window();
+        // A window whose tab is not the current one is framed but never raised: raising it would bury
+        // the tab in front of it. The rest go through Render, which raises what it places.
+        for (id, rect) in hidden {
+            self.place(id, rect);
+        }
         let mut effects = vec![Effect::Render(placements)];
-        if let Some(w) = self.model.as_ref().unwrap().focused_window() {
+        if let Some(w) = focused {
             effects.push(Effect::FocusWindow(w));
         }
         self.refresh();

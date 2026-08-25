@@ -30,20 +30,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
                 Effect::Render(placements) => {
                     let shown: HashSet<WindowId> = placements.iter().map(|(id, _)| *id).collect();
                     for (id, rect) in &placements {
-                        // A minimized window keeps its tab but isn't placed.
-                        if self.windows.is_minimized(*id) {
-                            continue;
-                        }
-                        // Re-frame after a monitor change once it settles (some apps land short otherwise).
-                        let previous = self.windows.get(*id).and_then(|w| w.placed);
-                        let moved_display = previous.is_some_and(|old| screen_of(old, &self.screens_cg) != screen_of(*rect, &self.screens_cg));
-                        if let Some(w) = self.windows.get_mut(*id) {
-                            w.placed = Some(*rect);
-                        }
-                        self.backend.set_frame(*id, *rect);
-                        if moved_display {
-                            self.pending_reframe.push((*id, *rect));
-                        }
+                        self.place(*id, *rect);
                     }
                     if !self.pending_reframe.is_empty() {
                         self.reframe_deadline = Some(std::time::Instant::now() + REFRAME_SETTLE);
@@ -90,6 +77,24 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         // Panels, menus and vase's own chrome sit above by design, so only normal windows can cover a pane.
         let stack: Vec<(WindowId, Rect)> = self.backend.list_windows().into_iter().filter(|w| w.layer == 0).map(|w| (w.id, w.frame)).collect();
         any_covered(&stack, &panes)
+    }
+
+    /// Move one window onto `rect` and remember the placement. A minimized window keeps its tab but is
+    /// not placed.
+    pub(super) fn place(&mut self, id: WindowId, rect: Rect) {
+        if self.windows.is_minimized(id) {
+            return;
+        }
+        // Re-frame after a monitor change once it settles (some apps land short otherwise).
+        let previous = self.windows.get(id).and_then(|w| w.placed);
+        let moved_display = previous.is_some_and(|old| screen_of(old, &self.screens_cg) != screen_of(rect, &self.screens_cg));
+        if let Some(w) = self.windows.get_mut(id) {
+            w.placed = Some(rect);
+        }
+        self.backend.set_frame(id, rect);
+        if moved_display {
+            self.pending_reframe.push((id, rect));
+        }
     }
 
     /// Re-assert the frames of windows that moved to another monitor, once they've settled (after `REFRAME_SETTLE`).

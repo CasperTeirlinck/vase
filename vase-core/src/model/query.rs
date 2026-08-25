@@ -58,6 +58,23 @@ impl Model {
         out
     }
 
+    /// Every window in every tab, on the rect its own tab's layout gives it. The zoom is ignored: it
+    /// belongs to what is on screen, which `placements` answers.
+    pub fn all_placements(&self) -> Vec<(WindowId, Rect)> {
+        let mut out = Vec::new();
+        for screen in &self.screens {
+            for tab in &screen.tabs {
+                let mut laid = Vec::new();
+                layout(&tab.root, screen.rect, &mut laid);
+                out.extend(laid.into_iter().filter_map(|(_, pane, rect)| match pane {
+                    Pane::Window(w) => Some((w, rect)),
+                    Pane::Empty => None,
+                }));
+            }
+        }
+        out
+    }
+
     /// Every screen's current-tab empty-pane rects; the bool flags the focused one.
     pub fn empty_panes(&self) -> Vec<(Rect, bool)> {
         let mut out = Vec::new();
