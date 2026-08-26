@@ -98,3 +98,16 @@ fn stack_move_reorders_and_clamps() {
     let Node::Stack { items, selected, .. } = stack_move(at_end, PaneId(5), 1).unwrap() else { panic!() };
     assert_eq!((items, selected), (vec![win(1), win(2)], 1));
 }
+
+#[test]
+fn splitting_a_stack_wraps_it_rather_than_reaching_inside_it() {
+    let stack = Node::Stack { id: PaneId(0), items: vec![win(1), win(2)], selected: 1 };
+    let split = split_pane(stack.clone(), PaneId(0), Dir::Horizontal, PaneId(7)).expect("a stack splits around itself");
+
+    let Node::Split { dir, ratios, children } = split else { panic!("the stack is now one side of a split") };
+    assert_eq!(dir, Dir::Horizontal);
+    assert_eq!(ratios, vec![0.5, 0.5]);
+    // The stack is untouched, items, selection and id: the new pane went beside it, not into it.
+    assert_eq!(children[0], stack);
+    assert_eq!(children[1], leaf(7, Pane::Empty));
+}

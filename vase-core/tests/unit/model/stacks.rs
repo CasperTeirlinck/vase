@@ -155,3 +155,20 @@ fn a_zoomed_stack_leaves_its_bar_the_strip_it_sits_on() {
     assert_eq!(m.focused_pane_rect(), Some(SCREEN));
     assert!(m.stacks().is_empty(), "the stack behind a zoomed pane draws no bar");
 }
+
+#[test]
+fn splitting_a_tab_that_is_one_whole_stack_puts_the_new_pane_beside_it() {
+    let mut m = one(&[win(1), win(2)]);
+    m.screens[0].tabs.truncate(1);
+    m.screens[0].tabs[0].root = stack(vec![Pane::Window(win(1)), Pane::Window(win(2))], 0);
+    m.screens[0].tabs[0].focused = PaneId(0);
+
+    let (m, effects) = apply(m, Command::Split(Dir::Horizontal));
+    let Node::Split { children, .. } = &m.screens[0].tabs[0].root else { panic!("the tab is now split") };
+    assert!(matches!(&children[0], Node::Stack { items, .. } if items.len() == 2), "the stack keeps both its windows");
+    assert!(matches!(&children[1], Node::Leaf { pane: Pane::Empty, .. }), "the new pane is empty");
+    // Focus moves to the empty pane, which is what opens the picker over it, and only the stack's
+    // selected window is on screen.
+    assert!(m.focused_pane_is_empty());
+    assert!(matches!(effects.first(), Some(Effect::Render(p)) if p.len() == 1));
+}

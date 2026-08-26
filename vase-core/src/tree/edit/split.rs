@@ -1,12 +1,16 @@
 use super::super::{leaf_pane, Dir, Node, Pane, PaneId, WindowId};
 use super::{collapse, rebuild_children};
 
-/// Replace `Leaf(target)` with `Split(dir)[Leaf(target), Leaf{new_id, Empty}]` at 0.5/0.5.
+/// Replace the pane holding `target` with `Split(dir)[it, Leaf{new_id, Empty}]` at 0.5/0.5.
 pub fn split_pane(node: Node, target: PaneId, dir: Dir, new_id: PaneId) -> Option<Node> {
     match node {
         Node::Leaf { id, pane } if id == target => Some(Node::Split { dir, ratios: vec![0.5, 0.5], children: vec![Node::Leaf { id, pane }, Node::Leaf { id: new_id, pane: Pane::Empty }] }),
         Node::Leaf { .. } => None,
-        // A stack has no split axis; splitting it is a no-op.
+        // A stack splits around itself: its items share one rectangle, so the new pane goes beside the
+        // whole stack rather than inside it.
+        Node::Stack { id, items, selected } if id == target => {
+            Some(Node::Split { dir, ratios: vec![0.5, 0.5], children: vec![Node::Stack { id, items, selected }, Node::Leaf { id: new_id, pane: Pane::Empty }] })
+        }
         Node::Stack { .. } => None,
         Node::Split { dir: d, ratios, children } => rebuild_children(children, |c| split_pane(c, target, dir, new_id)).map(|children| Node::Split { dir: d, ratios, children }),
     }
