@@ -9,6 +9,7 @@ pub struct StackBar {
     pub rect: Rect,
     pub items: Vec<WindowId>,
     pub selected: usize,
+    /// This stack is its tab's focused pane.
     pub focused: bool,
 }
 
@@ -38,11 +39,11 @@ impl Model {
     /// Visible window placements across all screens.
     pub fn placements(&self) -> Vec<(WindowId, Rect)> {
         let mut out = Vec::new();
-        for (si, screen) in self.screens.iter().enumerate() {
+        for screen in &self.screens {
             let Some(tab) = screen.current_tab() else {
                 continue;
             };
-            if self.zoomed && si == self.focused_screen {
+            if tab.zoomed {
                 if let Some(Pane::Window(w)) = leaf_pane(&tab.root, tab.focused) {
                     out.push((w, zoom_rect(screen.rect, tab)));
                     continue;
@@ -94,7 +95,7 @@ impl Model {
 
     /// Per tab across all screens: `(window panes, label window, custom name)`, and the flat index of the focused tab.
     #[allow(clippy::type_complexity)]
-    pub fn bar_tabs(&self) -> (Vec<(Vec<WindowId>, Option<WindowId>, Option<String>)>, usize) {
+    pub fn bar_tabs(&self) -> (Vec<(Vec<WindowId>, Option<WindowId>, Option<String>, bool)>, usize) {
         let mut tabs = Vec::new();
         let mut flat_current = 0;
         let mut offset = 0;
@@ -106,7 +107,7 @@ impl Model {
                 let ws = windows(&t.root);
                 // A single-window tab's name lives with the window; a multi-window tab carries a group name on the tab.
                 let name = if ws.len() == 1 { self.names.get(&ws[0]).cloned().or_else(|| t.name.clone()) } else { t.name.clone() };
-                tabs.push((ws, tab_label_window(t), name));
+                tabs.push((ws, tab_label_window(t), name, t.zoomed));
             }
             offset += screen.tabs.len();
         }
@@ -137,7 +138,7 @@ impl Model {
     pub fn focused_pane_rect(&self) -> Option<Rect> {
         let screen = self.fs()?;
         let tab = screen.current_tab()?;
-        if self.zoomed && matches!(leaf_pane(&tab.root, tab.focused), Some(Pane::Window(_))) {
+        if tab.zoomed && matches!(leaf_pane(&tab.root, tab.focused), Some(Pane::Window(_))) {
             return Some(zoom_rect(screen.rect, tab));
         }
         let mut out = Vec::new();
@@ -169,15 +170,15 @@ impl Model {
     /// Every visible stack's local tab bar, across all screens' current tabs.
     pub fn stacks(&self) -> Vec<StackBar> {
         let mut out = Vec::new();
-        for (si, screen) in self.screens.iter().enumerate() {
+        for screen in &self.screens {
             let Some(tab) = screen.current_tab() else {
                 continue;
             };
             let mut bars = Vec::new();
-            collect_stacks(&tab.root, screen.rect, si == self.focused_screen, tab.focused, &mut bars);
+            collect_stacks(&tab.root, screen.rect, tab.focused, &mut bars);
             // Zoomed, the focused pane covers the screen: the other stacks are behind it, and the
             // one that is zoomed spans what it now fills rather than the slot it came from.
-            if self.zoomed && si == self.focused_screen {
+            if tab.zoomed {
                 bars.retain(|bar| bar.focused);
                 for bar in &mut bars {
                     bar.rect = screen.rect;
@@ -200,7 +201,7 @@ fn zoom_rect(screen: Rect, tab: &Tab) -> Rect {
 }
 
 /// Push a `StackBar` (full rect) for each `Stack`, subdividing `area` like `layout`.
-fn collect_stacks(node: &Node, area: Rect, screen_focused: bool, focused: PaneId, out: &mut Vec<StackBar>) {
+fn collect_stacks(node: &Node, area: Rect, focused: PaneId, out: &mut Vec<StackBar>) {
     match node {
         Node::Leaf { .. } => {}
         Node::Stack { id, items, selected } => {
@@ -216,7 +217,7 @@ fn collect_stacks(node: &Node, area: Rect, screen_focused: bool, focused: PaneId
                 Some(Pane::Window(_)) => items[..*selected].iter().filter(|p| matches!(p, Pane::Window(_))).count(),
                 _ => 0,
             };
-            out.push(StackBar { rect: area, items: win_items, selected: sel, focused: screen_focused && *id == focused });
+            out.push(StackBar { rect: area, items: win_items, selected: sel, focused: *id == focused });
         }
         Node::Split { dir, ratios, children } => {
             let mut offset = 0.0;
@@ -225,7 +226,7 @@ fn collect_stacks(node: &Node, area: Rect, screen_focused: bool, focused: PaneId
                     Dir::Horizontal => Rect::new(area.x + offset, area.y, area.w * ratio, area.h),
                     Dir::Vertical => Rect::new(area.x, area.y + offset, area.w, area.h * ratio),
                 };
-                collect_stacks(child, child_rect, screen_focused, focused, out);
+                collect_stacks(child, child_rect, focused, out);
                 offset += match dir {
                     Dir::Horizontal => area.w * ratio,
                     Dir::Vertical => area.h * ratio,

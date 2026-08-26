@@ -28,7 +28,7 @@ fn select_tab_sets_current_and_out_of_range_is_a_noop() {
 fn move_tab_reorders_and_clamps_at_the_boundary() {
     let (m, effects) = apply(three(), Command::MoveTab(1));
     assert_eq!(m.screens[0].current, 1);
-    let reps: Vec<_> = m.bar_tabs().0.iter().map(|(_, r, _)| *r).collect();
+    let reps: Vec<_> = m.bar_tabs().0.iter().map(|(_, rep, _, _)| *rep).collect();
     assert_eq!(reps, vec![Some(win(2)), Some(win(1)), Some(win(3))]);
     assert_eq!(effects, vec![]);
     // Already at the front: moving left is a no-op.
@@ -42,7 +42,7 @@ fn bar_tabs_reports_a_representative_window_per_tab() {
     let (m, _) = apply(three(), Command::Split(Dir::Horizontal));
     // Tab 0 now has an empty focused pane; its representative is window 1.
     let (tabs, current) = m.bar_tabs();
-    let reps: Vec<_> = tabs.iter().map(|(_, r, _)| *r).collect();
+    let reps: Vec<_> = tabs.iter().map(|(_, rep, _, _)| *rep).collect();
     assert_eq!(reps, vec![Some(win(1)), Some(win(2)), Some(win(3))]);
     // Tab 0's icons list still holds its window (win1).
     assert_eq!(tabs[0].0, vec![win(1)]);
@@ -74,6 +74,30 @@ fn a_named_window_keeps_its_name_across_a_move_into_a_split_and_back() {
     assert_eq!(m.names.get(&win(2)), Some(&"bar".to_string()));
     let (m, _) = apply(m, Command::BreakPane);
     let (tabs, _) = m.bar_tabs();
-    let win2_tab = tabs.iter().find(|(ws, _, _)| ws == &vec![win(2)]).expect("win 2 has its own tab again");
+    let win2_tab = tabs.iter().find(|(ws, _, _, _)| ws == &vec![win(2)]).expect("win 2 has its own tab again");
     assert_eq!(win2_tab.2.as_deref(), Some("bar"));
+}
+
+#[test]
+fn a_zoom_stays_with_the_tab_it_was_made_in() {
+    // Two tabs, each a split. Zoom the first one's focused pane.
+    let mut m = one(&[win(1)]);
+    m.screens[0].tabs[0].root = Node::Split {
+        dir: Dir::Horizontal,
+        ratios: vec![0.5, 0.5],
+        children: vec![Node::Leaf { id: PaneId(0), pane: Pane::Window(win(1)) }, Node::Leaf { id: PaneId(1), pane: Pane::Window(win(2)) }],
+    };
+    m.screens[0].tabs.push(Tab::single(PaneId(2), Pane::Window(win(3))));
+    let (m, _) = apply(m, Command::ToggleZoom);
+    assert_eq!(m.placements(), vec![(win(1), SCREEN)], "the zoomed pane owns the screen");
+
+    // Move to the other tab: it lays out normally, and only the tab left behind is marked.
+    let (m, _) = apply(m, Command::SelectTab(1));
+    assert_eq!(m.placements(), vec![(win(3), SCREEN)]);
+    let marks: Vec<bool> = m.bar_tabs().0.iter().map(|(_, _, _, zoomed)| *zoomed).collect();
+    assert_eq!(marks, vec![true, false], "the mark stays on the tab that is zoomed");
+
+    // Back again, and the zoom is where it was left.
+    let (m, _) = apply(m, Command::SelectTab(0));
+    assert_eq!(m.placements(), vec![(win(1), SCREEN)]);
 }

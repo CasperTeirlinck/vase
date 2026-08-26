@@ -10,9 +10,8 @@ fn break_pane_from_a_stack_in_a_split_keeps_the_rest_in_the_split() {
         children: vec![Node::Leaf { id: PaneId(1), pane: Pane::Window(win(1)) }, Node::Stack { id: PaneId(2), items: vec![Pane::Window(win(2)), Pane::Window(win(3))], selected: 1 }],
     };
     let m = Model {
-        screens: vec![Screen { rect: SCREEN, tabs: vec![Tab { root, focused: PaneId(2), name: None }], current: 0 }],
+        screens: vec![Screen { rect: SCREEN, tabs: vec![Tab { root, focused: PaneId(2), name: None, zoomed: false }], current: 0 }],
         focused_screen: 0,
-        zoomed: false,
         names: HashMap::new(),
         next_pane_id: 3,
     };
@@ -40,11 +39,10 @@ fn break_pane_from_a_plain_stack_tab_pops_the_item_and_keeps_its_name() {
     let m = Model {
         screens: vec![Screen {
             rect: SCREEN,
-            tabs: vec![Tab { root: Node::Stack { id: PaneId(0), items: vec![Pane::Window(win(1)), Pane::Window(win(2))], selected: 1 }, focused: PaneId(0), name: None }],
+            tabs: vec![Tab { root: Node::Stack { id: PaneId(0), items: vec![Pane::Window(win(1)), Pane::Window(win(2))], selected: 1 }, focused: PaneId(0), name: None, zoomed: false }],
             current: 0,
         }],
         focused_screen: 0,
-        zoomed: false,
         names,
         next_pane_id: 1,
     };
@@ -68,9 +66,8 @@ fn cancel_stackify_on_a_split_pane_keeps_focus_on_that_pane() {
         children: vec![Node::Leaf { id: PaneId(1), pane: Pane::Window(win(1)) }, Node::Leaf { id: PaneId(2), pane: Pane::Window(win(2)) }],
     };
     let m = Model {
-        screens: vec![Screen { rect: SCREEN, tabs: vec![Tab { root, focused: PaneId(2), name: None }], current: 0 }],
+        screens: vec![Screen { rect: SCREEN, tabs: vec![Tab { root, focused: PaneId(2), name: None, zoomed: false }], current: 0 }],
         focused_screen: 0,
-        zoomed: false,
         names: HashMap::new(),
         next_pane_id: 3,
     };

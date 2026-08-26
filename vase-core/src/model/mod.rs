@@ -1,5 +1,5 @@
 use crate::geometry::Rect;
-use crate::tree::{Node, PaneId, WindowId};
+use crate::tree::{Node, Pane, PaneId, WindowId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -20,6 +20,17 @@ pub struct Tab {
     pub root: Node,
     pub focused: PaneId,
     pub name: Option<String>,
+    /// This tab's focused pane fills the screen. Per tab, so leaving a zoomed tab leaves the zoom
+    /// behind with it. Defaulted, so a layout saved before it existed still loads.
+    #[serde(default)]
+    pub zoomed: bool,
+}
+
+impl Tab {
+    /// A tab holding one pane: what adopting a window, a new tab, and breaking a pane out all make.
+    pub fn single(id: PaneId, pane: Pane) -> Tab {
+        Tab { root: Node::Leaf { id, pane }, focused: id, name: None, zoomed: false }
+    }
 }
 
 /// One monitor's state.
@@ -47,8 +58,6 @@ pub struct Model {
     pub screens: Vec<Screen>,
     /// Which monitor has keyboard focus.
     pub focused_screen: usize,
-    /// The focused screen's focused window fills that screen.
-    pub zoomed: bool,
     /// Custom name per window,
     /// keyed by window so it survives splits, moves, and stacks.
     #[serde(default, alias = "stack_names")]

@@ -30,7 +30,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Open the tab-rename prompt (prefix-t), seeded with the current tab's name.
     pub fn start_rename(&mut self) {
         let (tabs, cur) = self.model.as_ref().unwrap().bar_tabs();
-        let seed = tabs.get(cur).and_then(|(_, _, n)| n.clone()).unwrap_or_default();
+        let seed = tabs.get(cur).and_then(|(_, _, name, _)| name.clone()).unwrap_or_default();
         self.prompt = Some((PromptKind::Rename, seed));
         self.refresh();
     }

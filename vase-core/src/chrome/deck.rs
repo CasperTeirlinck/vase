@@ -138,7 +138,7 @@ impl<C: Painter> Deck<C> {
         let bar_tabs: Vec<BarTab> = tabs
             .iter()
             .enumerate()
-            .map(|(i, (windows, rep, name))| {
+            .map(|(i, (windows, rep, name, zoomed))| {
                 let icons: Vec<String> = windows.iter().map(|id| ctx.windows.app(*id).to_string()).collect();
                 let badges: Vec<bool> = icons.iter().map(|a| ctx.badges.contains(a)).collect();
                 let hotkey = icons.iter().any(|a| ctx.hotkeys.iter().any(|h| app_matches(a, &h.app)));
@@ -159,7 +159,7 @@ impl<C: Painter> Deck<C> {
                 // Dim tabs not on the focused monitor; the number is the tab's `prefix-N` shortcut.
                 let dim = model.screen_tab(i).is_some_and(|(si, _)| si != model.focused_screen);
                 let off_workspace = windows.iter().any(|id| ctx.off_workspace.contains(id));
-                BarTab { icons, badges, label, zoomed: model.zoomed && i == selected, number: i + 1, dim, off_workspace, hotkey }
+                BarTab { icons, badges, label, zoomed: *zoomed, number: i + 1, dim, off_workspace, hotkey }
             })
             .collect();
         let bar = Bar { rect: bar_rect, tabs: &bar_tabs, apps: ctx.windowless, selected, main: true, armed: ctx.prefix_armed };

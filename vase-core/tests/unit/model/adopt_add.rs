@@ -55,7 +55,7 @@ fn all_placements_covers_the_tabs_no_one_is_looking_at() {
 
     // A zoom is about what is on screen, so it does not reach the tabs behind it.
     let mut zoomed = h_split(false);
-    zoomed.zoomed = true;
+    zoomed.screens[0].tabs[0].zoomed = true;
     assert_eq!(zoomed.placements().len(), 1, "the zoomed pane owns the screen");
     assert_eq!(zoomed.all_placements().len(), 2, "both panes still have a layout rect");
 }

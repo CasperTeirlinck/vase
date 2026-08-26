@@ -1,13 +1,13 @@
 use super::render_and_focus;
 use crate::model::{Effect, Model, Tab};
-use crate::tree::{windows, Node, Pane};
+use crate::tree::{windows, Pane};
 
 pub(super) fn new_tab(mut model: Model) -> (Model, Vec<Effect>) {
     let id = model.next_id();
     let Some(screen) = model.fs_mut() else {
         return (model, vec![]);
     };
-    screen.tabs.push(Tab { root: Node::Leaf { id, pane: Pane::Empty }, focused: id, name: None });
+    screen.tabs.push(Tab::single(id, Pane::Empty));
     screen.current = screen.tabs.len() - 1;
     let effects = render_and_focus(&model);
     (model, effects)

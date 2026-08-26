@@ -1,7 +1,7 @@
 use super::{render_and_focus, resize_focus, RESIZE_STEP};
 use crate::focus::Direction;
 use crate::model::{Effect, Model, Tab};
-use crate::tree::{find_window, leaf_pane, leaves, remove_leaf_with_window, remove_selected_pane, set_leaf_pane, split_pane, windows, Dir, Node, Pane, WindowId};
+use crate::tree::{find_window, leaf_pane, leaves, remove_leaf_with_window, remove_selected_pane, set_leaf_pane, split_pane, windows, Dir, Pane, WindowId};
 
 pub(super) fn split(mut model: Model, dir: Dir) -> (Model, Vec<Effect>) {
     let Some(from) = model.focused_tab().map(|t| t.focused) else {
@@ -43,7 +43,10 @@ pub(super) fn resize(mut model: Model, dir: Direction) -> (Model, Vec<Effect>) {
 }
 
 pub(super) fn toggle_zoom(mut model: Model) -> (Model, Vec<Effect>) {
-    model.zoomed = !model.zoomed;
+    let Some(tab) = model.focused_tab_mut() else {
+        return (model, vec![]);
+    };
+    tab.zoomed = !tab.zoomed;
     let effects = render_and_focus(&model);
     (model, effects)
 }
@@ -140,7 +143,7 @@ pub(super) fn break_pane(mut model: Model) -> (Model, Vec<Effect>) {
     // keyed by the window, so it follows the window without any transfer here. Focus stays on the current tab.
     if let Some(Pane::Window(w)) = pane {
         let pid = model.next_id();
-        model.screens[fsi].tabs.push(Tab { root: Node::Leaf { id: pid, pane: Pane::Window(w) }, focused: pid, name: None });
+        model.screens[fsi].tabs.push(Tab::single(pid, Pane::Window(w)));
     }
     let effects = render_and_focus(&model);
     (model, effects)

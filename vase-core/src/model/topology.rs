@@ -7,16 +7,16 @@ impl Model {
     /// One single-pane tab per window, on its paired screen index.
     pub fn adopt(screens: &[Rect], windows: &[(WindowId, usize)]) -> Model {
         if screens.is_empty() {
-            return Model { screens: vec![], focused_screen: 0, zoomed: false, names: HashMap::new(), next_pane_id: 0 };
+            return Model { screens: vec![], focused_screen: 0, names: HashMap::new(), next_pane_id: 0 };
         }
         let mut model_screens: Vec<Screen> = screens.iter().map(|rect| Screen { rect: *rect, tabs: vec![], current: 0 }).collect();
         let mut next = 0u64;
         for (w, si) in windows {
             let id = PaneId(next);
             next += 1;
-            model_screens[*si].tabs.push(Tab { root: Node::Leaf { id, pane: Pane::Window(*w) }, focused: id, name: None });
+            model_screens[*si].tabs.push(Tab::single(id, Pane::Window(*w)));
         }
-        Model { screens: model_screens, focused_screen: 0, zoomed: false, names: HashMap::new(), next_pane_id: next }
+        Model { screens: model_screens, focused_screen: 0, names: HashMap::new(), next_pane_id: next }
     }
 
     /// Append `w` as a new single-pane tab on `screen`, without moving focus.
@@ -27,7 +27,7 @@ impl Model {
         let si = screen.min(self.screens.len() - 1);
         let id = PaneId(self.next_pane_id);
         self.next_pane_id += 1;
-        self.screens[si].tabs.push(Tab { root: Node::Leaf { id, pane: Pane::Window(w) }, focused: id, name: None });
+        self.screens[si].tabs.push(Tab::single(id, Pane::Window(w)));
     }
 
     /// Drop `Window` leaves absent from `map`, then rename the survivors via `map`.

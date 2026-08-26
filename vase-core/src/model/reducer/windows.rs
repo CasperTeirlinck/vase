@@ -1,12 +1,12 @@
 use super::{locate_window, render_and_focus};
 use crate::focus::{neighbor, Direction};
 use crate::model::{Effect, Model, Tab};
-use crate::tree::{leaf_pane, leaves, remove_leaf_with_window, select_stack_window, set_leaf_pane, swap_leaves, Node, Pane, WindowId};
+use crate::tree::{leaf_pane, leaves, remove_leaf_with_window, select_stack_window, set_leaf_pane, swap_leaves, Pane, WindowId};
 
 pub(super) fn add_window(mut model: Model, id: WindowId, si: usize) -> (Model, Vec<Effect>) {
     let pid = model.next_id();
     let screen = &mut model.screens[si];
-    screen.tabs.push(Tab { root: Node::Leaf { id: pid, pane: Pane::Window(id) }, focused: pid, name: None });
+    screen.tabs.push(Tab::single(pid, Pane::Window(id)));
     screen.current = screen.tabs.len() - 1;
     model.focused_screen = si;
     let effects = render_and_focus(&model);

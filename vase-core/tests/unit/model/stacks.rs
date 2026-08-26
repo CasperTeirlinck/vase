@@ -90,7 +90,7 @@ fn split_with_a_stack() -> Model {
 fn a_zoomed_stack_bar_spans_the_screen_the_stack_now_fills() {
     let mut m = split_with_a_stack();
     assert_eq!(m.stacks()[0].rect, Rect::new(0.0, 0.0, 50.0, 100.0), "unzoomed it sits in its half");
-    m.zoomed = true;
+    m.screens[0].tabs[0].zoomed = true;
     // Zoomed, the stack covers the screen, so its bar has to span the screen too rather than hang
     // over the middle of the window.
     assert_eq!(m.stacks(), vec![StackBar { rect: SCREEN, items: vec![win(1), win(3)], selected: 0, focused: true }]);
@@ -100,7 +100,7 @@ fn a_zoomed_stack_bar_spans_the_screen_the_stack_now_fills() {
 fn zooming_a_pane_hides_the_bars_of_the_stacks_it_covers() {
     let mut m = split_with_a_stack();
     m.screens[0].tabs[0].focused = PaneId(1); // the plain window, not the stack
-    m.zoomed = true;
+    m.screens[0].tabs[0].zoomed = true;
     assert!(m.stacks().is_empty(), "the stack is behind the zoomed window");
 }
 
@@ -139,7 +139,7 @@ fn a_zoomed_stack_leaves_its_bar_the_strip_it_sits_on() {
         children: vec![stack(vec![Pane::Window(win(1)), Pane::Window(win(2))], 0), Node::Leaf { id: PaneId(9), pane: Pane::Window(win(3)) }],
     };
     m.screens[0].tabs[0].focused = PaneId(0);
-    m.zoomed = true;
+    m.screens[0].tabs[0].zoomed = true;
 
     // The bar spans the screen, so the window starts below it rather than under it.
     let below = Rect::new(SCREEN.x, SCREEN.y + bar_height(), SCREEN.w, SCREEN.h - bar_height());
