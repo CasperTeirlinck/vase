@@ -110,3 +110,20 @@ fn stacks_reports_the_stack_rect_and_items() {
     let (m, _) = apply(m, Command::FillPane(win(2))); // stack [W1, W2] sel 1
     assert_eq!(m.stacks(), vec![StackBar { rect: SCREEN, items: vec![win(1), win(2)], selected: 1, focused: true }]);
 }
+
+#[test]
+fn a_resync_places_a_stack_s_occluded_items_behind_the_selected_one() {
+    // Two windows in one stack: one selected and on screen, one behind it.
+    let mut m = one(&[win(1), win(2)]);
+    m.screens[0].tabs[0].root = stack(vec![Pane::Window(win(1)), Pane::Window(win(2))], 0);
+    m.screens[0].tabs.truncate(1);
+
+    let content = Rect::new(SCREEN.x, SCREEN.y + bar_height(), SCREEN.w, SCREEN.h - bar_height());
+    assert_eq!(m.placements(), vec![(win(1), content)], "only the selected item is on screen");
+
+    // Both share the one rect, so the occluded one is put back exactly behind the selected one.
+    let all = m.all_placements();
+    assert_eq!(all.len(), 2);
+    assert!(all.contains(&(win(1), content)));
+    assert!(all.contains(&(win(2), content)), "the item behind gets the same rect, not its stale frame");
+}

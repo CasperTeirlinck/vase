@@ -60,15 +60,30 @@ pub fn bbox(rects: &[Rect]) -> Rect {
     Rect::new(x0, y0, x1 - x0, y1 - y0)
 }
 
-/// Append `(pane_id, pane, rect)` for every leaf under `node` within `area`.
+/// Append `(pane_id, pane, rect)` for every leaf under `node` within `area`. A stack contributes the
+/// one item that is on screen.
 pub fn layout(node: &Node, area: Rect, out: &mut Vec<(PaneId, Pane, Rect)>) {
+    layout_panes(node, area, false, out)
+}
+
+/// Like `layout`, but a stack contributes every one of its items, all on the single rect they share:
+/// what a resync needs to put the occluded ones back behind the selected one.
+pub fn layout_stacked(node: &Node, area: Rect, out: &mut Vec<(PaneId, Pane, Rect)>) {
+    layout_panes(node, area, true, out)
+}
+
+fn layout_panes(node: &Node, area: Rect, every_stack_item: bool, out: &mut Vec<(PaneId, Pane, Rect)>) {
     match node {
         Node::Leaf { id, pane } => out.push((*id, *pane, area)),
         Node::Stack { id, items, selected } => {
-            // Reserve the top strip for the bar; place only the selected item below.
+            // Reserve the top strip for the bar; the items share the rect below it.
             let strip = crate::chrome::bar_height();
             let content = Rect::new(area.x, area.y + strip, area.w, area.h - strip);
-            out.push((*id, items[*selected], content));
+            if every_stack_item {
+                out.extend(items.iter().map(|item| (*id, *item, content)));
+            } else {
+                out.push((*id, items[*selected], content));
+            }
         }
         Node::Split { dir, ratios, children } => {
             let mut offset = 0.0;
@@ -77,7 +92,7 @@ pub fn layout(node: &Node, area: Rect, out: &mut Vec<(PaneId, Pane, Rect)>) {
                     Dir::Horizontal => Rect::new(area.x + offset, area.y, area.w * ratio, area.h),
                     Dir::Vertical => Rect::new(area.x, area.y + offset, area.w, area.h * ratio),
                 };
-                layout(child, child_rect, out);
+                layout_panes(child, child_rect, every_stack_item, out);
                 offset += match dir {
                     Dir::Horizontal => area.w * ratio,
                     Dir::Vertical => area.h * ratio,
