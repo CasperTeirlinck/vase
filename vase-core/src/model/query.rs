@@ -44,7 +44,7 @@ impl Model {
             };
             if self.zoomed && si == self.focused_screen {
                 if let Some(Pane::Window(w)) = leaf_pane(&tab.root, tab.focused) {
-                    out.push((w, screen.rect));
+                    out.push((w, zoom_rect(screen.rect, tab)));
                     continue;
                 }
             }
@@ -138,7 +138,7 @@ impl Model {
         let screen = self.fs()?;
         let tab = screen.current_tab()?;
         if self.zoomed && matches!(leaf_pane(&tab.root, tab.focused), Some(Pane::Window(_))) {
-            return Some(screen.rect);
+            return Some(zoom_rect(screen.rect, tab));
         }
         let mut out = Vec::new();
         layout(&tab.root, screen.rect, &mut out);
@@ -187,6 +187,16 @@ impl Model {
         }
         out
     }
+}
+
+/// What a zoomed pane fills. A zoomed stack keeps its bar (`stacks` stretches it across the screen),
+/// so its window gives up the strip the bar sits on, exactly as it does at its normal size.
+fn zoom_rect(screen: Rect, tab: &Tab) -> Rect {
+    if crate::tree::stack_selected_window(&tab.root, tab.focused).is_none() {
+        return screen;
+    }
+    let strip = crate::chrome::bar_height();
+    Rect::new(screen.x, screen.y + strip, screen.w, screen.h - strip)
 }
 
 /// Push a `StackBar` (full rect) for each `Stack`, subdividing `area` like `layout`.

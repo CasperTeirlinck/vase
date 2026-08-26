@@ -127,3 +127,31 @@ fn a_resync_places_a_stack_s_occluded_items_behind_the_selected_one() {
     assert!(all.contains(&(win(1), content)));
     assert!(all.contains(&(win(2), content)), "the item behind gets the same rect, not its stale frame");
 }
+
+#[test]
+fn a_zoomed_stack_leaves_its_bar_the_strip_it_sits_on() {
+    // A stack sharing a split with a plain pane, the stack focused and zoomed.
+    let mut m = one(&[win(1), win(2)]);
+    m.screens[0].tabs.truncate(1);
+    m.screens[0].tabs[0].root = Node::Split {
+        dir: Dir::Horizontal,
+        ratios: vec![0.5, 0.5],
+        children: vec![stack(vec![Pane::Window(win(1)), Pane::Window(win(2))], 0), Node::Leaf { id: PaneId(9), pane: Pane::Window(win(3)) }],
+    };
+    m.screens[0].tabs[0].focused = PaneId(0);
+    m.zoomed = true;
+
+    // The bar spans the screen, so the window starts below it rather than under it.
+    let below = Rect::new(SCREEN.x, SCREEN.y + bar_height(), SCREEN.w, SCREEN.h - bar_height());
+    assert_eq!(m.placements(), vec![(win(1), below)]);
+    assert_eq!(m.focused_pane_rect(), Some(below), "the focus border traces what the window actually fills");
+    let bars = m.stacks();
+    assert_eq!(bars.len(), 1);
+    assert_eq!(bars[0].rect, SCREEN, "the zoomed stack's bar stretches across the screen");
+
+    // A plain pane has no bar of its own, so zoomed it owns the whole screen.
+    m.screens[0].tabs[0].focused = PaneId(9);
+    assert_eq!(m.placements(), vec![(win(3), SCREEN)]);
+    assert_eq!(m.focused_pane_rect(), Some(SCREEN));
+    assert!(m.stacks().is_empty(), "the stack behind a zoomed pane draws no bar");
+}
