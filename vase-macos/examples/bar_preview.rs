@@ -25,7 +25,7 @@ fn main() {
     let tabs = vec![
         tab(1, "Ghostty", "vase — zsh"),
         tab(2, "Safari", "Adopting Liquid Glass in your AppKit app"),
-        tab(3, "Finder", "tessera"),
+        BarTab { zoomed: true, ..tab(3, "Finder", "tessera") },
         BarTab { off_workspace: true, dim: true, ..tab(4, "Mail", "Inbox") },
         BarTab { hotkey: true, badges: vec![true], ..tab(5, "Slack", "dataminded") },
     ];

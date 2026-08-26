@@ -4,7 +4,7 @@
 //! for any platform, a native style lays itself out in its platform's crate.
 
 use super::theme::Role;
-use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK};
+use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK, ZOOM_MARK};
 use crate::geometry::Rect;
 
 /// Measures a string's width, at `size` points, in the painter's own font.
@@ -66,28 +66,27 @@ pub struct Metrics {
 
 /// One tab's content: its width, and its runs placed from `x0`.
 ///
-/// The order is the same in every style: off-workspace marker, position number, app icons, label.
+/// The order is the same in every style: markers, position number, app icons, label.
 pub fn content(tab: &BarTab, x0: f64, m: &Metrics, measure: Measure) -> (f64, Vec<Run>) {
     let text_color = if tab.dim { Role::Dim } else { Role::Text };
     let label = ellipsize(&tab.label, m.max_label, measure);
-    let label = if tab.zoomed { format!("{label} Z") } else { label };
     let label_w = if label.is_empty() { 0.0 } else { measure(&label, FONT_SIZE) };
 
-    let workspace = tab.off_workspace.then(|| format!("{WORKSPACE_MARK} "));
+    let marks = marks(tab);
     let number = format!("{} ", tab.number);
-    let workspace_w = workspace.as_deref().map_or(0.0, |s| measure(s, FONT_SIZE));
+    let marks_w = marks.as_deref().map_or(0.0, |s| measure(s, FONT_SIZE));
     let number_w = measure(&number, FONT_SIZE);
 
     let n = tab.icons.len() as f64;
     // A trailing label needs a gap after the last icon; a tab that is icons-only does not.
     let icons_w = if label_w > 0.0 { n * (m.icon + m.icon_gap) } else { n * m.icon + (n - 1.0).max(0.0) * m.icon_gap };
-    let body_w = m.content_left + workspace_w + number_w + m.number_gap + icons_w + label_w + m.right_pad;
+    let body_w = m.content_left + marks_w + number_w + m.number_gap + icons_w + label_w + m.right_pad;
 
     let mut runs = Vec::new();
     let mut x = x0 + m.content_left;
-    if let Some(w) = workspace {
-        runs.push(Run::Text { x, text: w, color: Role::Accent });
-        x += workspace_w;
+    if let Some(marks) = marks {
+        runs.push(Run::Text { x, text: marks, color: Role::Accent });
+        x += marks_w;
     }
     runs.push(Run::Text { x, text: number, color: Role::Dim });
     x += number_w + m.number_gap;
@@ -99,6 +98,18 @@ pub fn content(tab: &BarTab, x0: f64, m: &Metrics, measure: Measure) -> (f64, Ve
         runs.push(Run::Text { x, text: label, color: text_color });
     }
     (body_w, runs)
+}
+
+/// A tab's leading markers: on another workspace, and zoomed.
+fn marks(tab: &BarTab) -> Option<String> {
+    let mut out = String::new();
+    if tab.off_workspace {
+        out.push_str(WORKSPACE_MARK);
+    }
+    if tab.zoomed {
+        out.push_str(ZOOM_MARK);
+    }
+    (!out.is_empty()).then(|| format!("{out} "))
 }
 
 /// Trim `text` to the longest prefix that fits `max` once an ellipsis is appended.

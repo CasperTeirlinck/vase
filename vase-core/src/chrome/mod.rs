@@ -63,6 +63,10 @@ pub const FONT_SIZE: f64 = 12.0;
 /// Leading marker on a tab or row whose window is on another OS workspace.
 pub const WORKSPACE_MARK: &str = "◇";
 
+/// Leading marker on a zoomed tab. The centered asterisk, not the ASCII one, which rides too high
+/// against the label.
+pub const ZOOM_MARK: &str = "∗";
+
 /// Leading marker on a favorite app row in the picker.
 pub const FAVORITE_MARK: &str = "★";
 

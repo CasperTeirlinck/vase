@@ -123,7 +123,7 @@ Option/Command/Control/Shift on macOS and Alt/Win/Ctrl/Shift on Windows.
 | `⌥a ← ↑ → ↓`                  | move focus                                      |
 | `⌥a ⇧`+arrows / `⌥a ⇧HJKL`    | resize                                          |
 | `⌥a ⌘/⌃/⌥`+`HJKL` (or arrows) | move the pane                                   |
-| `⌥a z`                        | zoom the focused pane                           |
+| `⌥a z`                        | zoom the focused pane (its tab is marked `∗`)    |
 | `⌥a x`                        | break the pane out into its own tab             |
 | `⌥a m`                        | move the cursor to the focused pane             |
 | `⌥a ⌃r`                       | resync: force every window back onto the layout |

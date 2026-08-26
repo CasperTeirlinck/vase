@@ -134,8 +134,20 @@ fn a_zoomed_tab_is_marked_and_an_iconless_label_still_lays_out() {
     let mut t = tab(1, "Editor");
     t.zoomed = true;
     let l = lay(&[t], 0, true, &Mark::Logo);
+    // The mark leads in the accent color, like the off-workspace one; the label keeps its own text.
+    let Some(Run::Text { text, color, .. }) = l.tabs[0].content.first() else { panic!("a marker leads the tab") };
+    assert!(text.contains(crate::chrome::ZOOM_MARK));
+    assert_eq!(*color, Role::Accent);
     let Some(Run::Text { text, .. }) = l.tabs[0].content.last() else { panic!("the label is the last run") };
-    assert_eq!(text, "Editor Z");
+    assert_eq!(text, "Editor");
+
+    // Both states at once share one leading run: on another workspace, and zoomed.
+    let mut both = tab(2, "Editor");
+    both.zoomed = true;
+    both.off_workspace = true;
+    let l2 = lay(&[both], 0, true, &Mark::Logo);
+    let Some(Run::Text { text, .. }) = l2.tabs[0].content.first() else { panic!("a marker leads the tab") };
+    assert_eq!(*text, format!("{}{} ", crate::chrome::WORKSPACE_MARK, crate::chrome::ZOOM_MARK));
 
     // A whitespace-only custom name renders as just the icon: no label run, and a narrower tab.
     let mut bare = tab(1, "");
