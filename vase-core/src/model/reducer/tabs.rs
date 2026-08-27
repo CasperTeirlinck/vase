@@ -98,8 +98,8 @@ pub(super) fn move_tab_to_screen(mut model: Model, dir: isize) -> (Model, Vec<Ef
 }
 
 pub(super) fn set_tab_name(mut model: Model, name: Option<String>) -> (Model, Vec<Effect>) {
-    // Empty clears the override; a whitespace-only name is kept.
-    let name = name.filter(|s| !s.is_empty());
+    // A whitespace-only name is kept (icon-only), and so is an empty one: it pins the title label on a tab
+    // the bar would otherwise leave unlabeled. `None` clears back to the bar's default.
     let Some(tab) = model.focused_tab() else {
         return (model, vec![]);
     };

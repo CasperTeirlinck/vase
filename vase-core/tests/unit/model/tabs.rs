@@ -56,7 +56,10 @@ fn set_tab_name_sets_and_clears_the_current_tab_name() {
     // A whitespace-only name is kept (the bar renders it as icon-only).
     let (m, _) = apply(m, Command::SetTabName(Some(" ".into())));
     assert_eq!(m.bar_tabs().0[0].2.as_deref(), Some(" "));
-    // An empty name / None clears the override (title label returns).
+    // An empty name is kept too: it pins the title label when the bar's default is icon-only.
+    let (m, _) = apply(m, Command::SetTabName(Some(String::new())));
+    assert_eq!(m.bar_tabs().0[0].2.as_deref(), Some(""));
+    // None clears the override (the bar's default label returns).
     let (m, _) = apply(m, Command::SetTabName(None));
     assert_eq!(m.bar_tabs().0[0].2, None);
 }

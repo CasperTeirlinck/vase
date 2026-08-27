@@ -30,7 +30,9 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
     /// Open the tab-rename prompt (prefix-t), seeded with the current tab's name.
     pub fn start_rename(&mut self) {
         let (tabs, cur) = self.model.as_ref().unwrap().bar_tabs();
-        let seed = tabs.get(cur).and_then(|(_, _, name, _)| name.clone()).unwrap_or_default();
+        // With titles off, an unnamed tab acts as if named " "; seed that space so deleting it brings the title back.
+        let implicit = if self.tab_titles { String::new() } else { " ".to_string() };
+        let seed = tabs.get(cur).and_then(|(_, _, name, _)| name.clone()).unwrap_or(implicit);
         self.prompt = Some((PromptKind::Rename, seed));
         self.refresh();
     }
@@ -62,8 +64,12 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         if code == KeyCode::Return {
             let (kind, buf) = self.prompt.take().unwrap();
             match kind {
-                // Empty clears (auto title returns); a whitespace-only name is kept so the tab shows just its icon.
-                PromptKind::Rename => self.dispatch(Command::SetTabName((!buf.is_empty()).then_some(buf))),
+                // Empty brings the title back: with titles on it clears the override, with titles off it stores the
+                // empty name that pins the title. A whitespace-only name is kept so the tab shows just its icon.
+                PromptKind::Rename => {
+                    let name = (!buf.is_empty() || !self.tab_titles).then_some(buf);
+                    self.dispatch(Command::SetTabName(name));
+                }
                 PromptKind::StackRename => self.dispatch(Command::SetStackName((!buf.is_empty()).then_some(buf))),
                 PromptKind::Command => {
                     self.refresh(); // restore the tabs before running

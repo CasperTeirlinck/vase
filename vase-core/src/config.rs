@@ -23,13 +23,15 @@ pub struct Config {
     pub bar_position: Option<Position>,
     /// Which running apps with no window the bar trails behind its tabs.
     pub windowless: Windowless,
+    /// Label unnamed tabs with their window's title; off shows just the icon, as a blank manual name does.
+    pub tab_titles: bool,
     /// Draw the accent outline around the focused pane of a split tab; off by default.
     pub focus_border: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: Theme::DEFAULT, mark: Mark::Logo, bar_position: None, windowless: Windowless::Seen, focus_border: false }
+        Config { app_focus: Vec::new(), favorites: Vec::new(), theme: Theme::DEFAULT, mark: Mark::Logo, bar_position: None, windowless: Windowless::Seen, tab_titles: true, focus_border: false }
     }
 }
 
@@ -50,8 +52,8 @@ impl Config {
             }
         };
         let RawConfig { app_focus, favorites, theme, tabbar, focus_border } = raw;
-        let (mark, bar_position, windowless) = tabbar.resolve();
-        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position, windowless, focus_border }
+        let (mark, bar_position, windowless, tab_titles) = tabbar.resolve();
+        Config { app_focus: hotkeys(app_focus), favorites, theme: theme.resolve(), mark, bar_position, windowless, tab_titles, focus_border }
     }
 
     pub fn ensure(path: &Path) {
@@ -169,10 +171,11 @@ struct RawTabbar {
     mark: Option<String>,
     position: Option<String>,
     windowless: Option<String>,
+    titles: Option<bool>,
 }
 
 impl RawTabbar {
-    fn resolve(self) -> (Mark, Option<Position>, Windowless) {
+    fn resolve(self) -> (Mark, Option<Position>, Windowless, bool) {
         let mark = match self.mark.as_deref() {
             None | Some("vase") => Mark::Logo,
             Some("") => Mark::Hidden,
@@ -194,7 +197,7 @@ impl RawTabbar {
                 Windowless::Seen
             }),
         };
-        (mark, position, windowless)
+        (mark, position, windowless, self.titles.unwrap_or(true))
     }
 }
 

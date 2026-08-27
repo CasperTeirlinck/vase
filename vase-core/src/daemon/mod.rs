@@ -70,6 +70,8 @@ pub struct Daemon<B: Backend, C: Painter> {
     bar_position: Position,
     /// Whether to outline the focused pane of a split tab.
     focus_border: bool,
+    /// Whether unnamed tabs are labeled with their window's title.
+    tab_titles: bool,
     /// Managed windows currently on another workspace.
     off_workspace: HashSet<WindowId>,
     /// Polls to skip OS-focus-following after our own focus command, so the window list's lag on a just-raised window doesn't flip focus back (a flicker).
@@ -140,6 +142,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             help_open: false,
             bar_position,
             focus_border: config.focus_border,
+            tab_titles: config.tab_titles,
             off_workspace: HashSet::new(),
             focus_cooldown: 0,
             last_front: None,
@@ -208,6 +211,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
             main_screen: self.main_screen,
             bar_position: self.bar_position,
             focus_border: self.focus_border,
+            tab_titles: self.tab_titles,
             prefix_armed: self.prefix_armed,
             prompt: self.prompt.as_ref().map(|(kind, buf)| format!("{}{buf}\u{258f}", kind.prefix())),
             picker_open: self.pane_picker.is_some(),

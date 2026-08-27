@@ -20,6 +20,7 @@ impl<B: Backend, C: Painter> Daemon<B, C> {
         self.app_hotkeys = config.app_focus;
         self.favorites = config.favorites;
         self.focus_border = config.focus_border;
+        self.tab_titles = config.tab_titles;
         self.windowless_policy = config.windowless;
         let strip = crate::chrome::bar_height();
         crate::chrome::theme::set_theme(config.theme);

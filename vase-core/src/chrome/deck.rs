@@ -53,6 +53,8 @@ pub struct Context<'a> {
     pub bar_position: Position,
     /// Outline the focused pane of a split tab.
     pub focus_border: bool,
+    /// Label unnamed tabs with their window's title; off shows just the icon.
+    pub tab_titles: bool,
     pub prefix_armed: bool,
     /// Command line contents, drawn in place of the tabs while it is open.
     pub prompt: Option<String>,
@@ -143,11 +145,13 @@ impl<C: Painter> Deck<C> {
                 let badges: Vec<bool> = icons.iter().map(|a| ctx.badges.contains(a)).collect();
                 let hotkey = icons.iter().any(|a| ctx.hotkeys.iter().any(|h| app_matches(a, &h.app)));
                 let app = rep.map(|id| ctx.windows.app(id).to_string()).unwrap_or_default();
-                let label = match name {
-                    // A whitespace-only custom name renders as just the icon.
-                    Some(n) if n.trim().is_empty() => String::new(),
-                    Some(n) => n.clone(),
-                    None => {
+                let label = match name.as_deref() {
+                    Some(n) if !n.trim().is_empty() => n.to_string(),
+                    // A whitespace-only custom name renders as just the icon; so does an unnamed tab with titles off.
+                    Some(n) if !n.is_empty() => String::new(),
+                    None if !ctx.tab_titles => String::new(),
+                    // Unnamed with titles on, or named "" (the explicit ask for the title): the window's title.
+                    _ => {
                         let ct = clean_title(rep.map(|id| ctx.windows.title(id)).unwrap_or_default(), &app);
                         if ct.is_empty() {
                             app
@@ -179,8 +183,8 @@ impl<C: Painter> Deck<C> {
                     .enumerate()
                     .map(|(i, id)| {
                         let app = ctx.windows.app(*id).to_string();
-                        // A custom name overrides the window title.
-                        let label = match model.names.get(id) {
+                        // A custom name overrides the window title; an empty one asks for the title explicitly.
+                        let label = match model.names.get(id).filter(|n| !n.is_empty()) {
                             Some(name) => name.clone(),
                             None => {
                                 let ct = clean_title(ctx.windows.title(*id), &app);
