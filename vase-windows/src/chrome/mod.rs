@@ -16,7 +16,7 @@ use vase_core::chrome::help::{CellKind, HelpLayout, TextStyle};
 use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
 use vase_core::chrome::theme::{mark, style, Role, Style, PANE_PAD, PANE_RADIUS};
 use vase_core::chrome::BarHits;
-use vase_core::chrome::{bar_height, ListAt, Painter, SwitchRow, FONT_SIZE};
+use vase_core::chrome::{bar_height, ListAt, Painter, Position, SwitchRow, FONT_SIZE};
 use vase_core::geometry::{bbox, Rect};
 
 use gpu::{color, Gpu, Surface};
@@ -204,9 +204,9 @@ impl Painter for D2DPainter {
         laid.hits()
     }
 
-    fn prompt(&mut self, rect: Rect, text: &str) {
+    fn prompt(&mut self, rect: Rect, position: Position, text: &str) {
         // The command line owns the bar: the mark stays, the tabs do not.
-        let bare = self.lay_out(&Bar { rect, tabs: &[], apps: &[], selected: 0, main: true, armed: false }).bare();
+        let bare = self.lay_out(&Bar { rect, tabs: &[], apps: &[], selected: 0, main: true, armed: false, position }).bare();
         Self::paint_bar(&self.gpu, &self.icons, &mut self.bar, &bare, Some(text), &[]);
         self.gpu.commit();
     }

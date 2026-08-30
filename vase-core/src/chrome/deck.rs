@@ -127,7 +127,7 @@ impl<C: Painter> Deck<C> {
         let bar_rect = Rect::new(screen.x, bar_y, screen.w, strip);
         // While the command line is open it owns the bar; no tabs, and no click targets.
         if let Some(line) = &ctx.prompt {
-            self.painter.prompt(bar_rect, line);
+            self.painter.prompt(bar_rect, ctx.bar_position, line);
             self.bar_map = None;
             return;
         }
@@ -166,7 +166,7 @@ impl<C: Painter> Deck<C> {
                 BarTab { icons, badges, label, zoomed: *zoomed, number: i + 1, dim, off_workspace, hotkey }
             })
             .collect();
-        let bar = Bar { rect: bar_rect, tabs: &bar_tabs, apps: ctx.windowless, selected, main: true, armed: ctx.prefix_armed };
+        let bar = Bar { rect: bar_rect, tabs: &bar_tabs, apps: ctx.windowless, selected, main: true, armed: ctx.prefix_armed, position: ctx.bar_position };
         let hits = self.painter.bar(&bar);
         self.bar_map = Some(BarMap { rect: bar_rect, hits, apps: ctx.windowless.to_vec() });
     }
@@ -203,7 +203,7 @@ impl<C: Painter> Deck<C> {
                 (Rect::new(stack.rect.x, stack.rect.y, stack.rect.w, super::bar_height()), tabs, stack.selected)
             })
             .collect();
-        let strips: Vec<Bar> = bars.iter().map(|(rect, tabs, selected)| Bar { rect: *rect, tabs, apps: &[], selected: *selected, main: false, armed: false }).collect();
+        let strips: Vec<Bar> = bars.iter().map(|(rect, tabs, selected)| Bar { rect: *rect, tabs, apps: &[], selected: *selected, main: false, armed: false, position: ctx.bar_position }).collect();
         let hits = self.painter.stack_bars(&strips);
         self.stack_hits = strips.iter().zip(hits).zip(&stacks).map(|((strip, hits), stack)| (strip.rect, hits, stack.items.clone())).collect();
     }

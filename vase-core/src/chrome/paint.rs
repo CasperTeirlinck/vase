@@ -4,6 +4,7 @@ use crate::geometry::Rect;
 
 use super::bar::{Bar, Hits};
 use super::help::HelpLayout;
+use super::Position;
 
 /// Where a drawn tab bar's clickable pieces landed.
 #[derive(Default)]
@@ -52,7 +53,7 @@ pub trait Painter {
     fn bar(&mut self, bar: &Bar) -> BarHits;
 
     /// Draw the bar as a command line rather than tabs: the strip and the leading mark, then `text`.
-    fn prompt(&mut self, rect: Rect, text: &str);
+    fn prompt(&mut self, rect: Rect, position: Position, text: &str);
 
     fn hide_bar(&mut self);
 

@@ -7,7 +7,7 @@ use objc2_foundation::{NSPoint, NSRect, NSSize};
 use objc2_quartz_core::CAShapeLayer;
 use vase_core::chrome::bar::{self, Bar, BarTab, Hits, Measure, Metrics, Run};
 use vase_core::chrome::theme::{mark, vase_mark, Mark, Role};
-use vase_core::chrome::BarHits;
+use vase_core::chrome::{BarHits, Position};
 use vase_core::geometry::Rect;
 
 use super::super::glass::backdrop;
@@ -16,7 +16,8 @@ use super::super::theme::{accent, active_text, role, text_col, vase_mark_bezier}
 use super::super::{bar_height, FONT_SIZE};
 use super::{app_icons, badge_dot, clipped_content, prefix_dot, prompt_label, strip_label, Parts, TabBar};
 
-/// Inset of the floating strip inside the reserved rect, on both sides.
+/// Inset of a stack's floating strip inside its rect, on both sides. The screen's bar runs the full width,
+/// flush with the tiled windows below it.
 const INSET: f64 = 8.0;
 /// Padding between the strip's rounded end and its first content.
 const PAD: f64 = 9.0;
@@ -38,14 +39,15 @@ const DOT_D: f64 = 7.0;
 
 impl TabBar {
     pub(super) fn show_glass(&mut self, bar: &Bar) -> BarHits {
-        let dot_x = bar.rect.w - INSET - PAD - DOT_D;
+        let inset = strip_inset(bar.main);
+        let dot_x = bar.rect.w - inset - PAD - DOT_D;
         // Windowless apps trail the tabs as bare icons, between the last tab and the prefix dot. Both
         // sit in the panel's own coordinates, outside the strip-local content view.
         let icons = bar::app_icons(bar.apps.len(), dot_x - PAD, ICON, ICON_GAP);
         let content_end = icons.first().copied().unwrap_or(dot_x);
         // Tabs stop short of whatever trails them; a stack bar has neither, so its content runs to the strip's end.
-        let content_w = if bar.main { content_end - INSET - PAD } else { bar.rect.w - 2.0 * INSET - PAD };
-        let (parts, left) = self.begin_glass(bar.rect, content_w, bar.main);
+        let content_w = if bar.main { content_end - inset - PAD } else { bar.rect.w - 2.0 * inset - PAD };
+        let (parts, left) = self.begin_glass(bar.rect, content_w, bar.main, bar.position);
         let font = chrome_font(FONT_SIZE);
         let mut labels: Vec<Retained<NSTextField>> = parts.glyph.into_iter().collect();
         let segments = segments(bar.tabs, left, &measure);
@@ -101,33 +103,54 @@ impl TabBar {
         }
         self.panel.show(&parts.container);
         self.labels = labels;
-        BarHits { tabs: hits(&segments), apps }
+        BarHits { tabs: hits(&segments, inset), apps }
     }
 
-    pub(super) fn prompt_glass(&mut self, rect: Rect, prompt: &str) {
+    pub(super) fn prompt_glass(&mut self, rect: Rect, position: Position, prompt: &str) {
         // Full width: the command line has no prefix dot to avoid.
-        let (parts, x) = self.begin_glass(rect, rect.w - 2.0 * INSET - PAD, true);
+        let (parts, x) = self.begin_glass(rect, rect.w - PAD, true, position);
         let text = segment(prompt, &chrome_font(FONT_SIZE), &text_col(), None);
-        let label = prompt_label(self.mtm, &text, x, rect.w - 2.0 * INSET);
+        let label = prompt_label(self.mtm, &text, x, rect.w);
         parts.content.addSubview(&label);
         self.labels = parts.glyph.into_iter().chain(std::iter::once(label)).collect();
         self.panel.show(&parts.container);
     }
 
-    /// Place the panel, float the glass strip in it, and draw the leading mark. Returns the parts to
+    /// Place the panel, lay the glass strip in it, and draw the leading mark. Returns the parts to
     /// fill and the strip-local x the content starts at.
-    fn begin_glass(&self, rect: Rect, content_w: f64, main: bool) -> (Parts, f64) {
+    fn begin_glass(&self, rect: Rect, content_w: f64, main: bool, position: Position) -> (Parts, f64) {
         let container = self.panel.place(rect);
         let scale = self.panel.scale();
-        let strip_w = (rect.w - 2.0 * INSET).max(0.0);
+        let inset = strip_inset(main);
+        let strip_w = (rect.w - 2.0 * inset).max(0.0);
         let h = bar_height();
-        let strip = NSRect::new(NSPoint::new(INSET, 0.0), NSSize::new(strip_w, h));
-        // The strip's own view is what the glass owns; the clipped content nests inside it, so a
-        // resize of the content view can't undo the clipping that keeps tabs off the prefix dot.
+        // The strip's own view is what the glass owns (or, for the screen's bar, rides on); the clipped
+        // content nests inside it, so a resize of the content view can't undo the clipping that keeps
+        // tabs off the prefix dot.
         let inner = NSView::initWithFrame(NSView::alloc(self.mtm), NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(strip_w, h)));
         let (content, layer) = clipped_content(self.mtm, content_w, scale);
         inner.addSubview(&content);
-        container.addSubview(&backdrop(self.mtm, strip, h / 2.0, Some(&inner)));
+        if main {
+            // Flush against a screen edge: overhang the glass past that edge inside a clipping wrapper,
+            // cutting its rounded corners there flat so the strip fills the screen corners. Clipping,
+            // not maskedCorners, because Liquid Glass draws its shape from its own cornerRadius and
+            // ignores the layer mask. The content rides on top as a sibling, in visible coordinates.
+            // (view coordinates are y-up)
+            let r = h / 2.0;
+            let glass_y = match position {
+                Position::Bottom => -r,
+                Position::Top => 0.0,
+            };
+            let glass = backdrop(self.mtm, NSRect::new(NSPoint::new(0.0, glass_y), NSSize::new(strip_w, h + r)), r, None);
+            let wrapper = NSView::initWithFrame(NSView::alloc(self.mtm), NSRect::new(NSPoint::new(inset, 0.0), NSSize::new(strip_w, h)));
+            wrapper.setClipsToBounds(true);
+            wrapper.addSubview(&glass);
+            wrapper.addSubview(&inner);
+            container.addSubview(&wrapper);
+        } else {
+            let strip = NSRect::new(NSPoint::new(inset, 0.0), NSSize::new(strip_w, h));
+            container.addSubview(&backdrop(self.mtm, strip, h / 2.0, Some(&inner)));
+        }
 
         let mut x = PAD;
         // Only the screen's tab bar carries the mark; a stack bar starts at its own tabs.
@@ -176,10 +199,19 @@ fn segments(tabs: &[BarTab], left: f64, measure: Measure) -> Vec<Segment> {
         .collect()
 }
 
+/// Side inset of the strip: the screen's bar runs edge to edge, a stack bar floats inside its rect.
+fn strip_inset(main: bool) -> f64 {
+    if main {
+        0.0
+    } else {
+        INSET
+    }
+}
+
 /// Each tab's clickable span, in the bar's own coordinates, claiming half the gap on either side so
 /// no click falls between two tabs.
-fn hits(segments: &[Segment]) -> Hits {
-    segments.iter().map(|s| (INSET + s.x0 - TAB_GAP / 2.0, INSET + s.x0 + s.w + TAB_GAP / 2.0)).collect()
+fn hits(segments: &[Segment], inset: f64) -> Hits {
+    segments.iter().map(|s| (inset + s.x0 - TAB_GAP / 2.0, inset + s.x0 + s.w + TAB_GAP / 2.0)).collect()
 }
 
 /// The brand mark's box at `x`, sized off the strip's height.
@@ -229,7 +261,7 @@ mod tests {
             assert_eq!(pair[1].x0 - (pair[0].x0 + pair[0].w), TAB_GAP, "tabs float apart, they do not interlock");
         }
         // Content sits inside its own capsule, and adjacent hit ranges meet exactly.
-        let hits = hits(&segments);
+        let hits = hits(&segments, INSET);
         for (seg, (a, b)) in segments.iter().zip(&hits) {
             let xs: Vec<f64> = seg
                 .runs

@@ -4,7 +4,7 @@ use objc2::MainThreadMarker;
 use vase_core::chrome::bar::{Bar, Hits};
 use vase_core::chrome::help::HelpLayout;
 use vase_core::chrome::BarHits;
-use vase_core::chrome::{ListAt, Painter, SwitchRow};
+use vase_core::chrome::{ListAt, Painter, Position, SwitchRow};
 use vase_core::geometry::Rect;
 
 use super::help::HelpView;
@@ -39,8 +39,8 @@ impl Painter for AppKitPainter {
         self.bar.show(bar)
     }
 
-    fn prompt(&mut self, rect: Rect, text: &str) {
-        self.bar.show_prompt(rect, text);
+    fn prompt(&mut self, rect: Rect, position: Position, text: &str) {
+        self.bar.show_prompt(rect, position, text);
     }
 
     fn hide_bar(&mut self) {

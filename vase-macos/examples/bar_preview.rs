@@ -7,7 +7,7 @@ use objc2_app_kit::NSApplication;
 use objc2_foundation::{NSDate, NSDefaultRunLoopMode};
 use vase_core::chrome::bar::{Bar, BarTab};
 use vase_core::chrome::theme::{set_theme, Style, Theme};
-use vase_core::chrome::{bar_height, ListAt, Painter, SwitchRow};
+use vase_core::chrome::{bar_height, ListAt, Painter, Position, SwitchRow};
 use vase_core::geometry::Rect;
 use vase_macos::{nsapp_init, AppKitPainter};
 
@@ -34,7 +34,7 @@ fn main() {
     for app in tabs.iter().flat_map(|t| &t.icons).chain(&windowless) {
         painter.prewarm_icon(app);
     }
-    painter.bar(&Bar { rect: Rect::new(0.0, 300.0, 1200.0, bar_height()), tabs: &tabs, apps: &windowless, selected: 1, main: true, armed: false });
+    painter.bar(&Bar { rect: Rect::new(0.0, 300.0, 1200.0, bar_height()), tabs: &tabs, apps: &windowless, selected: 1, main: true, armed: false, position: Position::Bottom });
 
     let rows: Vec<SwitchRow> = tabs.iter().map(row).collect();
     // Centered below the bar, so the two surfaces can be looked at (or screenshot) together.

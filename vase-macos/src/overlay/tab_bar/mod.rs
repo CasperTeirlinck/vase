@@ -8,7 +8,7 @@ use objc2_foundation::{NSAttributedString, NSPoint, NSRect, NSSize, NSString};
 use objc2_quartz_core::CALayer;
 use vase_core::chrome::bar::{Bar, Hits};
 use vase_core::chrome::theme::{style, Style};
-use vase_core::chrome::BarHits;
+use vase_core::chrome::{BarHits, Position};
 use vase_core::geometry::Rect;
 
 use super::bar_height;
@@ -50,10 +50,10 @@ impl TabBar {
     }
 
     /// Turn the bar into a command line: the leading mark stays, and `prompt` fills the rest as a single line of text.
-    pub fn show_prompt(&mut self, rect: Rect, prompt: &str) {
+    pub fn show_prompt(&mut self, rect: Rect, position: Position, prompt: &str) {
         match style() {
-            Style::Native => self.prompt_glass(rect, prompt),
-            Style::Powerline => self.prompt_powerline(rect, prompt),
+            Style::Native => self.prompt_glass(rect, position, prompt),
+            Style::Powerline => self.prompt_powerline(rect, position, prompt),
         }
     }
 

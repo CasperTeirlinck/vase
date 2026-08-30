@@ -1,6 +1,7 @@
 use super::*;
 use vase_core::chrome::bar::BarTab;
 use vase_core::chrome::theme::{set_theme, Style, Theme};
+use vase_core::chrome::Position;
 
 /// A fixed-pitch stand-in for Segoe's metrics.
 fn measure(text: &str, size: f64) -> f64 {
@@ -13,7 +14,7 @@ fn tab(number: usize) -> BarTab {
 
 fn strip(tabs: &[BarTab], main: bool) -> Strip {
     set_theme(Theme { style: Style::Native, ..Theme::DEFAULT });
-    layout(&Bar { rect: Rect::new(0.0, 0.0, 1200.0, bar_height()), tabs, apps: &[], selected: 1, main, armed: false }, &measure)
+    layout(&Bar { rect: Rect::new(0.0, 0.0, 1200.0, bar_height()), tabs, apps: &[], selected: 1, main, armed: false, position: Position::Bottom }, &measure)
 }
 
 #[test]

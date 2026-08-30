@@ -8,7 +8,7 @@ use objc2_quartz_core::{CALayer, CAShapeLayer};
 use vase_core::chrome::bar::{Bar, Run};
 use vase_core::chrome::powerline::{self, BarLayout, LeadGlyph, DOT_D, TAB_ICON};
 use vase_core::chrome::theme::mark;
-use vase_core::chrome::BarHits;
+use vase_core::chrome::{BarHits, Position};
 use vase_core::geometry::Rect;
 
 use super::super::text::{app_icon, chrome_font, measure, segment};
@@ -87,8 +87,8 @@ impl TabBar {
         BarHits { tabs: layout.hits(), apps }
     }
 
-    pub(super) fn prompt_powerline(&mut self, rect: Rect, prompt: &str) {
-        let bar = Bar { rect, tabs: &[], apps: &[], selected: 0, main: true, armed: false };
+    pub(super) fn prompt_powerline(&mut self, rect: Rect, position: Position, prompt: &str) {
+        let bar = Bar { rect, tabs: &[], apps: &[], selected: 0, main: true, armed: false, position };
         let layout = powerline::layout(&bar, &mark(), &measure).bare();
         // Full width: the command line has no prefix dot to avoid.
         let parts = self.begin_powerline(&layout, rect.w);

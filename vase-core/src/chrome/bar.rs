@@ -4,7 +4,7 @@
 //! for any platform, a native style lays itself out in its platform's crate.
 
 use super::theme::Role;
-use super::{FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK, ZOOM_MARK};
+use super::{Position, FAVORITE_MARK, FONT_SIZE, WORKSPACE_MARK, ZOOM_MARK};
 use crate::geometry::Rect;
 
 /// Measures a string's width, at `size` points, in the painter's own font.
@@ -25,6 +25,8 @@ pub struct Bar<'a> {
     pub main: bool,
     /// The prefix chord is armed.
     pub armed: bool,
+    /// Screen edge the bar sits flush against. A stack bar floats mid-screen and ignores it.
+    pub position: Position,
 }
 
 #[derive(Debug, Clone, PartialEq)]

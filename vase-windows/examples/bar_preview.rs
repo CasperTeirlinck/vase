@@ -12,7 +12,7 @@ use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, PeekMessageW, Tr
 use vase_core::backend::Backend;
 use vase_core::chrome::bar::{Bar, BarTab};
 use vase_core::chrome::theme::{set_theme, Style, Theme};
-use vase_core::chrome::{bar_height, ListAt, Painter, SwitchRow};
+use vase_core::chrome::{bar_height, ListAt, Painter, Position, SwitchRow};
 use vase_core::geometry::Rect;
 use vase_windows::{D2DPainter, WindowsBackend};
 
@@ -42,7 +42,7 @@ fn main() {
     }
     // The icons resolve on a worker thread, so the first draw waits for it rather than showing gaps.
     sleep(Duration::from_millis(750));
-    painter.bar(&Bar { rect: Rect::new(screen.x, screen.y, screen.w, bar_height()), tabs: &tabs, apps: &[], selected: 1, main: true, armed: false });
+    painter.bar(&Bar { rect: Rect::new(screen.x, screen.y, screen.w, bar_height()), tabs: &tabs, apps: &[], selected: 1, main: true, armed: false, position: Position::Bottom });
 
     let rows: Vec<SwitchRow> = tabs.iter().map(row).collect();
     painter.list(ListAt::Centered(screen), "switch to: flu", &rows, 1);

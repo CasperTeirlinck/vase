@@ -26,7 +26,7 @@ fn lay(tabs: &[BarTab], selected: usize, main: bool, mark: &Mark) -> BarLayout {
 fn lay_with(tabs: &[BarTab], selected: usize, main: bool, mark: &Mark, apps: &[String]) -> BarLayout {
     // Lay out against the powerline style's own strip, whatever the default theme is.
     set_theme(Theme { style: Style::Powerline, ..Theme::DEFAULT });
-    layout(&Bar { rect: strip(), tabs, apps, selected, main, armed: false }, mark, &measure)
+    layout(&Bar { rect: strip(), tabs, apps, selected, main, armed: false, position: crate::chrome::Position::Bottom }, mark, &measure)
 }
 
 #[test]
